@@ -1,0 +1,181 @@
+{
+  "tech_stack": [
+    "JavaScript",
+    "Node.js",
+    "Express.js",
+    "React",
+    "Vite",
+    "PostgreSQL",
+    "Solidity",
+    "Hardhat",
+    "Web3.js",
+    "Tailwind CSS"
+  ],
+  "features": [
+    {
+      "name": "Authentication API",
+      "description": "User authentication system with JWT tokens and Google OAuth integration",
+      "files": [
+        "backend/routes/auth.js",
+        "backend/middleware/auth.js",
+        "frontend/src/pages/Login.jsx",
+        "frontend/src/pages/Signup.jsx"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BlockLearn Authentication API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/auth/login": {
+            "post": {
+              "summary": "User login",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "email": { "type": "string" },
+                        "password": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "/api/auth/google": {
+            "post": {
+              "summary": "Google OAuth authentication"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Chat API",
+      "description": "Real-time chat functionality for mentor-student communication",
+      "files": [
+        "backend/routes/chat.js",
+        "frontend/src/pages/Chat.jsx"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BlockLearn Chat API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/chat/message": {
+            "post": {
+              "summary": "Send chat message",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "message": { "type": "string" },
+                        "sessionId": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Session Management API",
+      "description": "API for managing learning sessions between mentors and students",
+      "files": [
+        "backend/routes/sessions.js",
+        "frontend/src/pages/Sessions.jsx",
+        "frontend/src/pages/Match.jsx"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BlockLearn Session Management API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/sessions": {
+            "get": {
+              "summary": "Get user sessions"
+            },
+            "post": {
+              "summary": "Create new session"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Feedback API",
+      "description": "Rating and feedback system for completed sessions",
+      "files": [
+        "backend/routes/feedback.js",
+        "frontend/src/components/FeedbackForm.jsx"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BlockLearn Feedback API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/feedback": {
+            "post": {
+              "summary": "Submit session feedback",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "sessionId": { "type": "string" },
+                        "rating": { "type": "number" },
+                        "comment": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Blockchain Integration",
+      "description": "Smart contract integration for skill verification and token rewards",
+      "files": [
+        "contracts/SkillSwapContract.sol",
+        "frontend/src/lib/web3.js",
+        "hardhat.config.js"
+      ],
+      "api_doc": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "BlockLearn Blockchain API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/api/blockchain/verify": {
+            "post": {
+              "summary": "Verify skill completion on blockchain"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

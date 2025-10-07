@@ -136,6 +136,10 @@ All colors MUST be HSL.
     background: var(--gradient-secondary);
   }
 
+  .bg-gradient-hero {
+    background: var(--gradient-hero);
+  }
+
   .btn-primary {
     @apply px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-slate-900;
   }

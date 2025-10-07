@@ -1,10 +1,11 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import ChatWidget from "./components/ChatWidget";
+import ChatWidget from "./components/WorkingChatWidget";
 
 // Pages that exist
 import Index from "./pages/Index.jsx";
 import Signup from "./pages/Signup.jsx";
+import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Skills from "./pages/Skills.jsx";
 import Match from "./pages/Match.jsx";
@@ -27,6 +28,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/skills" element={<Skills />} />
         <Route path="/match" element={<Match />} />

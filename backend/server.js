@@ -7,6 +7,8 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 const authRoutes = require('./routes/auth');
 const feedbackRoutes = require('./routes/feedback');
 const chatRoutes = require('./routes/chat');
+const sessionsRoutes = require('./routes/sessions');
+const blockchainRoutes = require('./routes/blockchain');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,6 +26,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/sessions', sessionsRoutes);
+app.use('/api/blockchain', blockchainRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

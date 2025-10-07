@@ -1,14 +1,12 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import { GoogleLogin } from '@react-oauth/google';
 import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { Sparkles, ArrowLeft, Mail, User, CheckCircle, AlertCircle } from "lucide-react";
+import { Sparkles, ArrowLeft, Mail, Lock, CheckCircle, AlertCircle } from "lucide-react";
 
-function Signup() {
+function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -23,9 +21,9 @@ function Signup() {
     });
   };
 
-  const handleSignup = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !email || !password) {
+    if (!email || !password) {
       setMessage("Please fill in all fields");
       return;
     }
@@ -34,27 +32,70 @@ function Signup() {
     setMessage("");
 
     try {
-      // For demo purposes, we'll simulate account creation
-      // In a real app, you'd call an actual signup endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      setMessage("✅ Account created successfully!");
-      setTimeout(() => navigate("/dashboard"), 1500);
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userData', JSON.stringify(data.user));
+        setMessage("✅ Login successful!");
+        setTimeout(() => navigate("/dashboard"), 1500);
+      } else {
+        setMessage("Invalid credentials. Please try again.");
+      }
     } catch (error) {
-      setMessage("Signup failed. Please try again.");
+      setMessage("Login failed. Please check your connection and try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true);
+    setMessage("");
+    try {
+      const response = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ credential: credentialResponse.credential }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('userData', JSON.stringify(data.user));
+        setMessage("✅ Login successful!");
+        setTimeout(() => navigate("/dashboard"), 1500);
+      } else {
+        setMessage("Google login failed. Please try again.");
+      }
+    } catch (error) {
+      setMessage("Google login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    setMessage("Google login failed. Please try again.");
+  };
+
   return (
-    <div className="relative min-h-screen w-full bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 text-foreground overflow-hidden">
+    <div className="relative min-h-screen w-full bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 text-foreground overflow-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 via-purple-100/20 to-pink-100/20 dark:from-blue-900/20 dark:via-purple-900/20 dark:to-pink-900/20" />
-        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-pink-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }} />
+        <div className="absolute inset-0 bg-gradient-to-br from-green-100/20 via-blue-100/20 to-indigo-100/20 dark:from-green-900/20 dark:via-blue-900/20 dark:to-indigo-900/20" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-green-400/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-indigo-400/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '4s' }} />
       </div>
 
       {/* Content */}
@@ -68,9 +109,9 @@ function Signup() {
                 BlockLearn
               </span>
             </Link>
-            <h2 className="text-3xl font-bold text-foreground mb-2">Create Your Account</h2>
+            <h2 className="text-3xl font-bold text-foreground mb-2">Welcome Back</h2>
             <p className="text-muted-foreground">
-              Join the BlockLearn community today
+              Sign in to your BlockLearn account
             </p>
           </div>
 
@@ -93,40 +134,7 @@ function Signup() {
             />
 
             <div className="relative z-10">
-              <form onSubmit={handleSignup} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-foreground mb-2">
-                      <User className="w-4 h-4 inline mr-1" />
-                      First Name
-                    </label>
-                    <input
-                      id="firstName"
-                      type="text"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-foreground mb-2">
-                      <User className="w-4 h-4 inline mr-1" />
-                      Last Name
-                    </label>
-                    <input
-                      id="lastName"
-                      type="text"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
-                      required
-                    />
-                  </div>
-                </div>
-
+              <form onSubmit={handleLogin} className="space-y-6">
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                     <Mail className="w-4 h-4 inline mr-1" />
@@ -145,17 +153,24 @@ function Signup() {
 
                 <div>
                   <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
+                    <Lock className="w-4 h-4 inline mr-1" />
                     Password
                   </label>
                   <input
                     id="password"
                     type="password"
-                    placeholder="Create a strong password"
+                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
                     required
                   />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Link to="/forgot-password" className="text-sm text-primary hover:text-primary/80 transition-colors">
+                    Forgot password?
+                  </Link>
                 </div>
 
                 <button
@@ -169,13 +184,33 @@ function Signup() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Creating Account...
+                      Signing in...
                     </>
                   ) : (
-                    "Create Account"
+                    "Sign In"
                   )}
                 </button>
               </form>
+
+              {/* Divider */}
+              <div className="flex items-center gap-4 my-6">
+                <div className="flex-1 h-px bg-border"></div>
+                <span className="text-xs text-muted-foreground">or continue with</span>
+                <div className="flex-1 h-px bg-border"></div>
+              </div>
+
+              {/* Google Sign In */}
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                useOneTap={false}
+                theme="outline"
+                size="large"
+                text="signin_with"
+                shape="rectangular"
+                width="100%"
+                className="w-full"
+              />
 
               {/* Message Display */}
               {message && (
@@ -200,9 +235,9 @@ function Signup() {
           {/* Footer Links */}
           <div className="text-center space-y-4">
             <p className="text-muted-foreground">
-              Already have an account?{" "}
-              <Link to="/login" className="text-primary hover:text-primary/80 font-medium transition-colors">
-                Sign in here
+              Don't have an account?{" "}
+              <Link to="/signup" className="text-primary hover:text-primary/80 font-medium transition-colors">
+                Sign up here
               </Link>
             </p>
             <Link to="/" className="text-muted-foreground hover:text-foreground text-sm flex items-center justify-center gap-2 transition-colors">
@@ -216,4 +251,4 @@ function Signup() {
   );
 }
 
-export default Signup;
+export default Login;

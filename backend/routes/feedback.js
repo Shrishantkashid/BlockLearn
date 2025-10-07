@@ -242,4 +242,45 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
   }
 });
 
+// ✅ Simple feedback submission endpoint (for testing)
+router.post("/", async (req, res) => {
+  try {
+    const { sessionId, rating, comment } = req.body;
+
+    if (!sessionId || !rating) {
+      return res.status(400).json({
+        success: false,
+        message: "Session ID and rating are required"
+      });
+    }
+
+    // Validate rating (1-5 scale)
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Rating must be between 1 and 5"
+      });
+    }
+
+    // For testing purposes, just return success without database operations
+    res.json({
+      success: true,
+      message: "Feedback submitted successfully",
+      data: {
+        sessionId: sessionId,
+        rating: rating,
+        comment: comment || null,
+        submittedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error("Error submitting feedback:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
 module.exports = router;

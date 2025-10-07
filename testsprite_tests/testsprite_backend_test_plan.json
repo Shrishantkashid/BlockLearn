@@ -1,0 +1,37 @@
+[
+  {
+    "id": "TC001",
+    "title": "user login functionality",
+    "description": "Test the user login API endpoint to ensure it correctly authenticates users with valid email and password, and returns a valid JWT token."
+  },
+  {
+    "id": "TC002",
+    "title": "google oauth authentication",
+    "description": "Verify the Google OAuth authentication endpoint correctly handles OAuth login flow and issues JWT tokens for authenticated users."
+  },
+  {
+    "id": "TC003",
+    "title": "send chat message",
+    "description": "Test the chat message API to ensure messages are sent successfully in real-time during sessions and are associated with the correct session ID."
+  },
+  {
+    "id": "TC004",
+    "title": "get user sessions",
+    "description": "Verify the sessions retrieval API returns all sessions associated with the authenticated user accurately."
+  },
+  {
+    "id": "TC005",
+    "title": "create new session",
+    "description": "Test the session creation API to ensure authenticated users can create new learning sessions with valid data."
+  },
+  {
+    "id": "TC006",
+    "title": "submit session feedback",
+    "description": "Verify the feedback submission API correctly stores user ratings and comments linked to the specified session."
+  },
+  {
+    "id": "TC007",
+    "title": "verify skill completion on blockchain",
+    "description": "Test the blockchain verification API to ensure skill completions are correctly verified on the blockchain and token rewards are issued as per smart contract logic."
+  }
+]

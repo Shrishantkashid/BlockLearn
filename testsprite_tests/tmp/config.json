@@ -1,0 +1,16 @@
+{
+  "status": "commited",
+  "type": "backend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:5000",
+  "executionArgs": {
+    "projectName": "BlockLearn - Peer-to-Peer Learning Platform",
+    "projectPath": "c:\\Users\\Admin\\OneDrive\\Desktop\\Mini Project",
+    "testIds": [],
+    "additionalInstruction": "Run tests using TestSprite proxy to connect to local server",
+    "envs": {
+      "API_KEY": "sk-user-oo5rJdZcOK2Emcf5k7DOix2RRBhGPypVG5cWPZeKeGBjGrY-3MT5yds_tTk9mI0UkMfbxbSbFfcMYnmgr3W-ZBl_A8RS3VlAN5GLN0kqHo5JeorI_8xn2BngBnorJm0UWbM"
+    }
+  },
+  "proxy": "http://23f9bdb6-8342-41f4-a4e8-163837a990cd:Q1vUkTZsdIsPjySBLD33JYj11CaNXnrY@tun.testsprite.com:8080"
+}
