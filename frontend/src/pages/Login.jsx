@@ -1,29 +1,51 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { GoogleLogin } from '@react-oauth/google';
-import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { Sparkles, ArrowLeft, Mail, Lock, CheckCircle, AlertCircle } from "lucide-react";
+import { Sparkles, ArrowLeft, Mail, MessageSquare } from "lucide-react";
 
 function Login() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-  const [isHovering, setIsHovering] = useState(false);
+  const [step, setStep] = useState("email"); // "email" or "otp"
   const navigate = useNavigate();
 
-  const handleMouseMove = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMousePosition({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
-    });
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+    if (!email) {
+      setMessage("Please enter your email address");
+      return;
+    }
+
+    setIsLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.ok) {
+        setMessage("✅ OTP sent to your email!");
+        setStep("otp");
+      } else {
+        setMessage("Failed to send OTP. Please try again.");
+      }
+    } catch (error) {
+      setMessage("Failed to send OTP. Please check your connection and try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleLogin = async (e) => {
+  const handleVerifyOTP = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
+    if (!email || !otp) {
       setMessage("Please fill in all fields");
       return;
     }
@@ -32,12 +54,16 @@ function Login() {
     setMessage("");
 
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email,
+          otp,
+          isNewUser: false  // This is for login, not registration
+        }),
       });
 
       if (response.ok) {
@@ -47,10 +73,11 @@ function Login() {
         setMessage("✅ Login successful!");
         setTimeout(() => navigate("/dashboard"), 1500);
       } else {
-        setMessage("Invalid credentials. Please try again.");
+        const errorData = await response.json();
+        setMessage(errorData.message || "Invalid OTP. Please try again.");
       }
     } catch (error) {
-      setMessage("Login failed. Please check your connection and try again.");
+      setMessage("OTP verification failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -116,25 +143,9 @@ function Login() {
           </div>
 
           {/* Form Card */}
-          <div
-            className="backdrop-blur-md bg-white/50 dark:bg-slate-900/50 border border-border/50 rounded-2xl p-8 shadow-2xl relative overflow-hidden"
-            onMouseMove={handleMouseMove}
-            onMouseEnter={() => setIsHovering(true)}
-            onMouseLeave={() => setIsHovering(false)}
-          >
-            {/* Gradient Blob Effect */}
-            <div
-              className={`absolute pointer-events-none w-[400px] h-[400px] bg-gradient-hero opacity-20 rounded-full blur-3xl transition-opacity duration-200 ${
-                isHovering ? 'opacity-100' : 'opacity-0'
-              }`}
-              style={{
-                transform: `translate(${mousePosition.x - 200}px, ${mousePosition.y - 200}px)`,
-                transition: 'transform 0.1s ease-out'
-              }}
-            />
-
-            <div className="relative z-10">
-              <form onSubmit={handleLogin} className="space-y-6">
+          <div className="backdrop-blur-md bg-white/50 dark:bg-slate-900/50 border border-border/50 rounded-2xl p-8 shadow-2xl">
+            {step === "email" ? (
+              <form onSubmit={handleSendOTP} className="space-y-6">
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                     <Mail className="w-4 h-4 inline mr-1" />
@@ -151,26 +162,43 @@ function Login() {
                   />
                 </div>
 
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full px-8 py-4 rounded-xl bg-primary text-primary-foreground border border-primary/20 shadow-lg hover:bg-primary/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isLoading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Sending OTP...
+                    </>
+                  ) : (
+                    "Send OTP"
+                  )}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyOTP} className="space-y-6">
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-                    <Lock className="w-4 h-4 inline mr-1" />
-                    Password
+                  <label htmlFor="otp" className="block text-sm font-medium text-foreground mb-2">
+                    <MessageSquare className="w-4 h-4 inline mr-1" />
+                    Enter OTP
                   </label>
                   <input
-                    id="password"
-                    type="password"
-                    placeholder="Enter your password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    id="otp"
+                    type="text"
+                    placeholder="Enter 6-digit OTP"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
                     className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
                     required
                   />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <Link to="/forgot-password" className="text-sm text-primary hover:text-primary/80 transition-colors">
-                    Forgot password?
-                  </Link>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    OTP sent to: {email}
+                  </p>
                 </div>
 
                 <button
@@ -184,52 +212,55 @@ function Login() {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Signing in...
+                      Verifying...
                     </>
                   ) : (
-                    "Sign In"
+                    "Verify OTP"
                   )}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStep("email")}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ← Back to email
+                </button>
               </form>
+            )}
 
-              {/* Divider */}
-              <div className="flex items-center gap-4 my-6">
-                <div className="flex-1 h-px bg-border"></div>
-                <span className="text-xs text-muted-foreground">or continue with</span>
-                <div className="flex-1 h-px bg-border"></div>
-              </div>
-
-              {/* Google Sign In */}
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                useOneTap={false}
-                theme="outline"
-                size="large"
-                text="signin_with"
-                shape="rectangular"
-                width="100%"
-                className="w-full"
-              />
-
-              {/* Message Display */}
-              {message && (
-                <div className={`mt-4 p-4 rounded-xl backdrop-blur-sm ${
-                  message.includes("✅")
-                    ? "bg-primary/20 text-foreground border border-primary/30"
-                    : "bg-destructive/20 text-foreground border border-destructive/30"
-                }`}>
-                  <div className="flex items-center">
-                    {message.includes("✅") ? (
-                      <CheckCircle className="w-5 h-5 mr-2" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 mr-2" />
-                    )}
-                    <span className="text-sm font-medium">{message}</span>
-                  </div>
-                </div>
-              )}
+            {/* Divider */}
+            <div className="flex items-center gap-4 my-6">
+              <div className="flex-1 h-px bg-border"></div>
+              <span className="text-xs text-muted-foreground">or continue with</span>
+              <div className="flex-1 h-px bg-border"></div>
             </div>
+
+            {/* Google Sign In */}
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={handleGoogleError}
+              useOneTap={false}
+              theme="outline"
+              size="large"
+              text="signin_with"
+              shape="rectangular"
+              width="100%"
+              className="w-full"
+            />
+
+            {/* Message Display */}
+            {message && (
+              <div className={`mt-4 p-4 rounded-xl backdrop-blur-sm ${
+                message.includes("✅")
+                  ? "bg-primary/20 text-foreground border border-primary/30"
+                  : "bg-destructive/20 text-foreground border border-destructive/30"
+              }`}>
+                <div className="flex items-center">
+                  <span className="text-sm font-medium">{message}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Links */}

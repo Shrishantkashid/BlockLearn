@@ -81,7 +81,8 @@ const Register = () => {
       localStorage.setItem("userData", JSON.stringify(userData));
       
       setMessage("✅ Registration successful! Redirecting to dashboard...");
-      setTimeout(() => navigate("/dashboard"), 1500);
+      // Use navigate directly instead of setTimeout for more reliable redirection
+      navigate("/dashboard");
     } catch (error) {
       setMessage(error.response?.data?.message || error.response?.data?.error || error.message || "Error verifying OTP");
     } finally {
@@ -107,7 +108,8 @@ const Register = () => {
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("userData", JSON.stringify(res.data.user));
       setMessage("✅ Registration successful! Redirecting to dashboard...");
-      setTimeout(() => navigate("/dashboard"), 1500);
+      // Use navigate directly instead of setTimeout for more reliable redirection
+      navigate("/dashboard");
     } catch (error) {
       setMessage(error.response?.data?.message || "Google registration failed. Please try again.");
     } finally {

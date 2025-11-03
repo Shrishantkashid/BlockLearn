@@ -1,6 +1,5 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
-import ChatWidget from "./components/WorkingChatWidget";
 
 // Pages that exist
 import Index from "./pages/Index.jsx";
@@ -45,9 +44,6 @@ function App() {
         <Route path="/demo-beams" element={<DemoBeams />} />
         <Route path="/demo-login" element={<DemoLoginModern />} />
       </Routes>
-
-      {/* Advanced AI Chat Widget - appears on all pages */}
-      <ChatWidget />
     </div>
   );
 }

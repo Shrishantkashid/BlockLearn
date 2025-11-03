@@ -17,9 +17,8 @@ export default function Login() {
   const normalizeEmail = (value) => {
     const trimmed = (value || "").trim().toLowerCase();
     if (!trimmed) return "";
-    // TEMPORARILY DISABLED: Accept any email without auto-appending domain
-    return trimmed;
-    // ORIGINAL: return trimmed.includes("@") ? trimmed : `${trimmed}@saividya.ac.in`;
+    // Re-enable the campus email validation
+    return trimmed.includes("@") ? trimmed : `${trimmed}@saividya.ac.in`;
   };
 
   const sendOtp = async () => {
