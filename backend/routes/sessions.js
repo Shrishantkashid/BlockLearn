@@ -1,6 +1,7 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
 const pool = require("../config/database");
+const MatchingService = require("../utils/matchingService");
 
 const router = express.Router();
 
@@ -152,6 +153,9 @@ router.post("/", authenticateToken, async (req, res) => {
     const session = result.rows[0];
     const skill = skillCheck.rows[0];
     const mentor = mentorCheck.rows[0];
+
+    // Record session outcome (initially connected = true since session was created)
+    await MatchingService.recordSessionOutcome(session.id, true);
 
     res.status(201).json({
       success: true,

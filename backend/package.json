@@ -2,7 +2,8 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon",
-    "setup-db": "psql -U postgres -f backend/models/schema.sql"
+    "setup-db": "psql -U postgres -f backend/models/schema.sql",
+    "seed-matching": "node backend/seed-matching-data.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

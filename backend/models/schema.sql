@@ -96,3 +96,37 @@ CREATE TABLE chat_messages (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     metadata JSONB -- For storing additional message data like AI confidence, suggestions, etc.
 );
+
+-- Session feedback table
+CREATE TABLE feedback_sessions (
+    id SERIAL PRIMARY KEY,
+    session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
+    student_rating INTEGER CHECK (student_rating >= 1 AND student_rating <= 5),
+    student_feedback_type VARCHAR(20), -- 'positive', 'neutral', 'negative'
+    student_comment TEXT,
+    mentor_rating INTEGER CHECK (mentor_rating >= 1 AND mentor_rating <= 5),
+    mentor_feedback_type VARCHAR(20), -- 'positive', 'neutral', 'negative'
+    mentor_comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Match history table for ML training data
+CREATE TABLE match_history (
+    id SERIAL PRIMARY KEY,
+    student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    mentor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    skill_id INTEGER REFERENCES skills(id) ON DELETE CASCADE,
+    match_score DECIMAL(3,2), -- Normalized score between 0 and 1
+    score_breakdown JSONB, -- Detailed breakdown of scoring factors
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Session outcomes table for ML training data
+CREATE TABLE session_outcomes (
+    id SERIAL PRIMARY KEY,
+    session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
+    connected BOOLEAN, -- Whether the match led to a connection
+    feedback_data JSONB, -- Structured feedback data
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

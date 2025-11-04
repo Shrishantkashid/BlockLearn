@@ -1,6 +1,7 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
 const pool = require("../config/database");
+const MatchingService = require("../utils/matchingService");
 
 const router = express.Router();
 
@@ -78,6 +79,25 @@ router.post("/submit", authenticateToken, async (req, res) => {
       message: "Feedback submitted successfully",
       data: result.rows[0]
     });
+
+    // Update session outcome with detailed feedback data
+    try {
+      const feedbackData = {
+        rating: rating,
+        feedback_type: feedback_type,
+        comment: comment,
+        is_student: isStudent
+      };
+      
+      await MatchingService.recordSessionOutcome(
+        session_id,
+        true, // Connected is true since feedback was submitted
+        feedbackData
+      );
+    } catch (feedbackError) {
+      console.error("Error recording feedback for ML training:", feedbackError);
+      // Don't fail the main request if ML data recording fails
+    }
 
   } catch (error) {
     console.error("Error submitting feedback:", error);

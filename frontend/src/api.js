@@ -60,4 +60,20 @@ export async function getAllowedDomains() {
   return response.data;
 }
 
+// Matching API endpoints
+export async function getMatchingMentors(skillId) {
+  const response = await api.get(`/matching/mentors/${skillId}`);
+  return response.data;
+}
+
+export async function getMatchDetail(mentorId, skillId) {
+  const response = await api.get(`/matching/match-detail/${mentorId}/${skillId}`);
+  return response.data;
+}
+
+export async function getTrainingData() {
+  const response = await api.get('/matching/training-data');
+  return response.data;
+}
+
 export default api;

@@ -23,8 +23,26 @@ CREATE INDEX IF NOT EXISTS idx_skills_category ON skills(category);
 -- Composite index for common queries
 CREATE INDEX IF NOT EXISTS idx_user_skills_user_type ON user_skills(user_id, skill_type);
 
+-- Indexes for feedback_sessions
+CREATE INDEX IF NOT EXISTS idx_feedback_sessions_session_id ON feedback_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_sessions_student_rating ON feedback_sessions(student_rating);
+CREATE INDEX IF NOT EXISTS idx_feedback_sessions_mentor_rating ON feedback_sessions(mentor_rating);
+
+-- Indexes for match history
+CREATE INDEX IF NOT EXISTS idx_match_history_student_id ON match_history(student_id);
+CREATE INDEX IF NOT EXISTS idx_match_history_mentor_id ON match_history(mentor_id);
+CREATE INDEX IF NOT EXISTS idx_match_history_skill_id ON match_history(skill_id);
+CREATE INDEX IF NOT EXISTS idx_match_history_score ON match_history(match_score);
+
+-- Indexes for session outcomes
+CREATE INDEX IF NOT EXISTS idx_session_outcomes_session_id ON session_outcomes(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_outcomes_connected ON session_outcomes(connected);
+
 ANALYZE users;
 ANALYZE email_verifications;
 ANALYZE user_profiles;
 ANALYZE skills;
 ANALYZE user_skills;
+ANALYZE feedback_sessions;
+ANALYZE match_history;
+ANALYZE session_outcomes;
