@@ -70,8 +70,15 @@ function Login() {
         const data = await response.json();
         localStorage.setItem('token', data.token);
         localStorage.setItem('userData', JSON.stringify(data.user));
-        setMessage("✅ Login successful!");
-        setTimeout(() => navigate("/dashboard"), 1500);
+        
+        // Check if profile is complete
+        if (!data.user.profileComplete) {
+          setMessage("✅ Login successful! Redirecting to profile setup...");
+          setTimeout(() => navigate("/profile"), 1500);
+        } else {
+          setMessage("✅ Login successful!");
+          setTimeout(() => navigate("/dashboard"), 1500);
+        }
       } else {
         const errorData = await response.json();
         setMessage(errorData.message || "Invalid OTP. Please try again.");
@@ -99,8 +106,15 @@ function Login() {
         const data = await response.json();
         localStorage.setItem('token', data.token);
         localStorage.setItem('userData', JSON.stringify(data.user));
-        setMessage("✅ Login successful!");
-        setTimeout(() => navigate("/dashboard"), 1500);
+        
+        // Check if profile is complete
+        if (!data.user.profileComplete) {
+          setMessage("✅ Login successful! Redirecting to profile setup...");
+          setTimeout(() => navigate("/profile"), 1500);
+        } else {
+          setMessage("✅ Login successful!");
+          setTimeout(() => navigate("/dashboard"), 1500);
+        }
       } else {
         setMessage("Google login failed. Please try again.");
       }

@@ -10,6 +10,11 @@ const { OAuth2Client } = require('google-auth-library');
 
 const router = express.Router();
 
+// Test route to verify router is working
+router.get("/test", (req, res) => {
+  res.json({ success: true, message: "Auth router is working" });
+});
+
 // Debug: expose currently allowed campus email domains
 router.get("/allowed-domains", (req, res) => {
   const { getAllowedDomains } = require("../utils/helper");
@@ -380,6 +385,108 @@ router.post("/google", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Google authentication failed",
+    });
+  }
+});
+
+// ✅ Update user profile
+router.put("/profile", authenticateToken, async (req, res) => {
+  console.log("Profile update endpoint hit");
+  console.log("Request body:", req.body);
+  console.log("User from token:", req.user);
+  
+  try {
+    const { 
+      fullName, 
+      schoolName, 
+      grade, 
+      bio, 
+      skillsToLearn, 
+      skillsToTeach, 
+      learningGoals, 
+      interests 
+    } = req.body;
+    
+    // Basic validation
+    if (!fullName || !schoolName || !grade) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Full name, school name, and grade are required" 
+      });
+    }
+    
+    console.log("Profile update request received:", { 
+      userId: req.user.id, 
+      fullName, 
+      schoolName, 
+      grade 
+    });
+
+    // Get database connection
+    const db = await connectDB();
+    const usersCollection = db.collection('users');
+    const profilesCollection = db.collection('user_profiles');
+
+    // Update user profile
+    const user = await usersCollection.findOne({ _id: req.user.id });
+    if (!user) {
+      console.log("User not found:", req.user.id);
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Update user document to mark profile as complete
+    const userUpdateResult = await usersCollection.updateOne(
+      { _id: req.user.id },
+      { 
+        $set: { 
+          profile_complete: true,
+          updated_at: new Date()
+        }
+      }
+    );
+    
+    console.log("User update result:", userUpdateResult);
+
+    // Update or create user profile
+    const profileUpdateResult = await profilesCollection.updateOne(
+      { user_id: req.user.id },
+      { 
+        $set: { 
+          user_id: req.user.id,
+          full_name: fullName,
+          school_name: schoolName,
+          grade: grade,
+          bio: bio || "",
+          skills_to_learn: skillsToLearn || "",
+          skills_to_teach: skillsToTeach || "",
+          learning_goals: learningGoals || "",
+          interests: interests || "",
+          updated_at: new Date()
+        }
+      },
+      { upsert: true }
+    );
+    
+    console.log("Profile update result:", profileUpdateResult);
+
+    console.log("Profile updated successfully for user:", req.user.id);
+    return res.json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        campusVerified: user.campus_verified,
+        profileComplete: true,
+      },
+    });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error: " + error.message,
     });
   }
 });

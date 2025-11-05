@@ -78,8 +78,16 @@ function Signup() {
       if (response.data.success) {
         // Store token in localStorage
         localStorage.setItem("token", response.data.token);
-        setMessage("✅ Account created successfully!");
-        setTimeout(() => navigate("/dashboard"), 1500);
+        
+        // Check if profile is complete
+        const user = response.data.user;
+        if (!user.profileComplete) {
+          setMessage("✅ Account created successfully! Redirecting to profile setup...");
+          setTimeout(() => navigate("/profile"), 1500);
+        } else {
+          setMessage("✅ Account created successfully!");
+          setTimeout(() => navigate("/dashboard"), 1500);
+        }
       } else {
         setMessage(response.data.message || "Invalid OTP. Please try again.");
       }

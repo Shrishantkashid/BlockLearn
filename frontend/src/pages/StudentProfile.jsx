@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 
 const initialProfile = {
   // Basic Information
@@ -25,7 +26,10 @@ export default function StudentProfile() {
   const [profile, setProfile] = useState(initialProfile);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [activeTab, setActiveTab] = useState("basic");
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
     const stored = localStorage.getItem("studentProfile");
@@ -38,9 +42,41 @@ export default function StudentProfile() {
 
   const handleSave = async () => {
     setSaving(true);
+    setErrorMessage("");
+    
+    // Validate required fields
+    if (!profile.fullName || !profile.schoolName || !profile.grade) {
+      setErrorMessage("Please fill in all required fields (Full Name, School/College, and Grade/Year).");
+      setSaving(false);
+      return;
+    }
+    
     try {
-      localStorage.setItem("studentProfile", JSON.stringify(profile));
-      setSavedAt(new Date().toLocaleString());
+      // Save to backend
+      const response = await axios.put("/api/auth/profile", profile, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.data.success) {
+        // Also save to localStorage as backup
+        localStorage.setItem("studentProfile", JSON.stringify(profile));
+        setSavedAt(new Date().toLocaleString());
+        setErrorMessage(""); // Clear any previous error messages
+        
+        // Redirect to dashboard after saving
+        setTimeout(() => navigate("/dashboard"), 1500);
+      } else {
+        setErrorMessage("Failed to save profile: " + response.data.message);
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      if (error.response) {
+        setErrorMessage("Failed to save profile: " + (error.response.data.message || "Server error"));
+      } else if (error.request) {
+        setErrorMessage("Failed to save profile: No response from server. Please check your connection.");
+      } else {
+        setErrorMessage("Failed to save profile: " + error.message);
+      }
     } finally {
       setSaving(false);
     }
@@ -94,6 +130,12 @@ export default function StudentProfile() {
         {savedAt && (
           <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-6">
             <p className="text-green-800 dark:text-green-300 text-sm">✅ Profile saved successfully!</p>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-6">
+            <p className="text-red-800 dark:text-red-300 text-sm">❌ {errorMessage}</p>
           </div>
         )}
 

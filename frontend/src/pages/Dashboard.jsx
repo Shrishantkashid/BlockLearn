@@ -22,13 +22,26 @@ function Dashboard() {
           const res = await axios.get("/api/auth/me", {
             headers: { Authorization: `Bearer ${token}` },
           });
+          
+          // Check if profile is complete
+          if (!res.data.user.profileComplete) {
+            navigate("/profile");
+            return;
+          }
+          
           setUser(res.data.user);
         } catch (error) {
           console.log("Backend not available, using local storage data");
           // If backend is not available, try to get user data from localStorage
           const savedUser = localStorage.getItem("userData");
           if (savedUser) {
-            setUser(JSON.parse(savedUser));
+            const userData = JSON.parse(savedUser);
+            // Check if profile is complete
+            if (!userData.profileComplete) {
+              navigate("/profile");
+              return;
+            }
+            setUser(userData);
           } else {
             // No saved data, redirect to login
             handleLogout();
@@ -39,7 +52,13 @@ function Dashboard() {
       // No token, check if we have saved user data
       const savedUser = localStorage.getItem("userData");
       if (savedUser) {
-        setUser(JSON.parse(savedUser));
+        const userData = JSON.parse(savedUser);
+        // Check if profile is complete
+        if (!userData.profileComplete) {
+          navigate("/profile");
+          return;
+        }
+        setUser(userData);
       } else {
         // No saved data, redirect to login
         navigate("/login");
