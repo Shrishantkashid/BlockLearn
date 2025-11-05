@@ -4,7 +4,7 @@ import { sendOTP, verifyOTP } from './api';
 import axios from "axios";
 import { GoogleLogin } from '@react-oauth/google';
 import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { Sparkles, ArrowLeft, Mail, User, CheckCircle, AlertCircle } from "lucide-react";
+import { Sparkles, ArrowLeft, Mail, User, CheckCircle, AlertCircle, Shield } from "lucide-react";
 
 const Register = () => {
   const [step, setStep] = useState("enterDetails"); // enterDetails → otp
@@ -94,6 +94,20 @@ const Register = () => {
     setStep("enterDetails");
     setMessage("");
     setOtp("");
+  };
+
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    setMessage("");
+    
+    try {
+      await sendOTP(normalizeEmail(formData.email), true);
+      setMessage("OTP resent successfully! Check your inbox.");
+    } catch (error) {
+      setMessage(error.response?.data?.message || error.response?.data?.error || error.message || "Error resending OTP");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Google OAuth registration handler
@@ -264,23 +278,29 @@ const Register = () => {
             </div>
           ) : (
             <div className="space-y-6">
+              <div className="text-center">
+                <Shield className="w-12 h-12 text-primary mx-auto mb-3" />
+                <h3 className="text-xl font-bold text-foreground">Verify Your Email</h3>
+                <p className="text-muted-foreground mt-2">
+                  We've sent a 6-digit code to <span className="font-medium">{normalizeEmail(formData.email)}</span>
+                </p>
+              </div>
+              
               <div>
                 <label htmlFor="otp" className="block text-sm font-medium text-foreground mb-2 text-center">
-                  Enter Verification Code
+                  <Shield className="w-4 h-4 inline mr-1" />
+                  Enter OTP
                 </label>
                 <input
                   id="otp"
                   type="text"
-                  placeholder="000000"
+                  placeholder="123456"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  className="w-full px-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white text-center text-2xl tracking-[0.5em] placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent backdrop-blur-sm font-mono"
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-full px-4 py-4 bg-white/10 border border-white/20 rounded-xl text-white text-center text-2xl tracking-widest placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent backdrop-blur-sm font-mono"
                   maxLength="6"
                   onKeyPress={(e) => e.key === 'Enter' && verifyOtp()}
                 />
-                <p className="text-xs text-gray-400 mt-2 text-center">
-                  Code sent to: <span className="text-primary font-medium">{formData.email}</span>
-                </p>
               </div>
               
               <div className="flex space-x-3">
@@ -293,7 +313,7 @@ const Register = () => {
                 </button>
                 <button
                   onClick={verifyOtp}
-                  disabled={isLoading}
+                  disabled={isLoading || otp.length !== 6}
                   className="flex-1 px-6 py-3 rounded-xl bg-primary text-primary-foreground border border-primary/20 shadow-lg hover:bg-primary/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isLoading ? (
@@ -305,8 +325,18 @@ const Register = () => {
                       Verifying...
                     </>
                   ) : (
-                    "Verify & Register"
+                    "Verify OTP"
                   )}
+                </button>
+              </div>
+              
+              <div className="text-center">
+                <button
+                  onClick={handleResendOtp}
+                  disabled={isLoading}
+                  className="text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                >
+                  Resend OTP
                 </button>
               </div>
             </div>

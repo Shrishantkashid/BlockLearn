@@ -2,15 +2,17 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { Sparkles, ArrowLeft, Mail, User, CheckCircle, AlertCircle } from "lucide-react";
+import { Sparkles, ArrowLeft, Mail, User, CheckCircle, AlertCircle, Shield } from "lucide-react";
 
 function Signup() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [otp, setOtp] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const navigate = useNavigate();
@@ -23,9 +25,9 @@ function Signup() {
     });
   };
 
-  const handleSignup = async (e) => {
+  const handleSendOtp = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !email) {
       setMessage("Please fill in all fields");
       return;
     }
@@ -34,14 +36,79 @@ function Signup() {
     setMessage("");
 
     try {
-      // For demo purposes, we'll simulate account creation
-      // In a real app, you'd call an actual signup endpoint
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
+      const response = await axios.post("/api/auth/send-otp", {
+        email,
+        firstName,
+        lastName,
+        isNewUser: true
+      });
 
-      setMessage("✅ Account created successfully!");
-      setTimeout(() => navigate("/dashboard"), 1500);
+      if (response.data.success) {
+        setIsOtpSent(true);
+        setMessage("OTP sent to your email. Please check your inbox.");
+      } else {
+        setMessage(response.data.message || "Failed to send OTP. Please try again.");
+      }
     } catch (error) {
-      setMessage("Signup failed. Please try again.");
+      setMessage(error.response?.data?.message || "Failed to send OTP. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (!otp) {
+      setMessage("Please enter the OTP");
+      return;
+    }
+
+    setIsVerifying(true);
+    setMessage("");
+
+    try {
+      const response = await axios.post("/api/auth/verify-otp", {
+        email,
+        otp,
+        firstName,
+        lastName,
+        isNewUser: true
+      });
+
+      if (response.data.success) {
+        // Store token in localStorage
+        localStorage.setItem("token", response.data.token);
+        setMessage("✅ Account created successfully!");
+        setTimeout(() => navigate("/dashboard"), 1500);
+      } else {
+        setMessage(response.data.message || "Invalid OTP. Please try again.");
+      }
+    } catch (error) {
+      setMessage(error.response?.data?.message || "OTP verification failed. Please try again.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setIsLoading(true);
+    setMessage("");
+
+    try {
+      const response = await axios.post("/api/auth/send-otp", {
+        email,
+        firstName,
+        lastName,
+        isNewUser: true
+      });
+
+      if (response.data.success) {
+        setMessage("OTP resent successfully. Please check your email.");
+      } else {
+        setMessage(response.data.message || "Failed to resend OTP. Please try again.");
+      }
+    } catch (error) {
+      setMessage(error.response?.data?.message || "Failed to resend OTP. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -93,89 +160,131 @@ function Signup() {
             />
 
             <div className="relative z-10">
-              <form onSubmit={handleSignup} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+              {!isOtpSent ? (
+                <form onSubmit={handleSendOtp} className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="firstName" className="block text-sm font-medium text-foreground mb-2">
+                        <User className="w-4 h-4 inline mr-1" />
+                        First Name
+                      </label>
+                      <input
+                        id="firstName"
+                        type="text"
+                        placeholder="John"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="lastName" className="block text-sm font-medium text-foreground mb-2">
+                        <User className="w-4 h-4 inline mr-1" />
+                        Last Name
+                      </label>
+                      <input
+                        id="lastName"
+                        type="text"
+                        placeholder="Doe"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label htmlFor="firstName" className="block text-sm font-medium text-foreground mb-2">
-                      <User className="w-4 h-4 inline mr-1" />
-                      First Name
+                    <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
+                      <Mail className="w-4 h-4 inline mr-1" />
+                      Email Address
                     </label>
                     <input
-                      id="firstName"
-                      type="text"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      id="email"
+                      type="email"
+                      placeholder="your.email@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
                       required
                     />
                   </div>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full px-8 py-4 rounded-xl bg-primary text-primary-foreground border border-primary/20 shadow-lg hover:bg-primary/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isLoading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Sending OTP...
+                      </>
+                    ) : (
+                      "Send OTP"
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-6">
+                  <div className="text-center mb-6">
+                    <Shield className="w-12 h-12 text-primary mx-auto mb-3" />
+                    <h3 className="text-xl font-bold text-foreground">Verify Your Email</h3>
+                    <p className="text-muted-foreground mt-2">
+                      We've sent a 6-digit code to <span className="font-medium">{email}</span>
+                    </p>
+                  </div>
+
                   <div>
-                    <label htmlFor="lastName" className="block text-sm font-medium text-foreground mb-2">
-                      <User className="w-4 h-4 inline mr-1" />
-                      Last Name
+                    <label htmlFor="otp" className="block text-sm font-medium text-foreground mb-2">
+                      <Shield className="w-4 h-4 inline mr-1" />
+                      Enter OTP
                     </label>
                     <input
-                      id="lastName"
+                      id="otp"
                       type="text"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
+                      placeholder="123456"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm text-center text-2xl tracking-widest"
+                      maxLength={6}
                       required
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                    <Mail className="w-4 h-4 inline mr-1" />
-                    Email Address
-                  </label>
-                  <input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-                    Password
-                  </label>
-                  <input
-                    id="password"
-                    type="password"
-                    placeholder="Create a strong password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full px-8 py-4 rounded-xl bg-primary text-primary-foreground border border-primary/20 shadow-lg hover:bg-primary/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isLoading ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating Account...
-                    </>
-                  ) : (
-                    "Create Account"
-                  )}
-                </button>
-              </form>
+                  <div className="flex gap-3">
+                    <button
+                      type="submit"
+                      disabled={isVerifying || otp.length !== 6}
+                      className="flex-1 px-4 py-3 rounded-xl bg-primary text-primary-foreground border border-primary/20 shadow-lg hover:bg-primary/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    >
+                      {isVerifying ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Verifying...
+                        </>
+                      ) : (
+                        "Verify OTP"
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={isLoading}
+                      className="px-4 py-3 rounded-xl bg-secondary text-secondary-foreground border border-border shadow hover:bg-secondary/80 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Resend
+                    </button>
+                  </div>
+                </form>
+              )}
 
               {/* Message Display */}
               {message && (
@@ -192,6 +301,19 @@ function Signup() {
                     )}
                     <span className="text-sm font-medium">{message}</span>
                   </div>
+                </div>
+              )}
+
+              {/* Back to form link when OTP is sent */}
+              {isOtpSent && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsOtpSent(false)}
+                    className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+                  >
+                    Change email address
+                  </button>
                 </div>
               )}
             </div>

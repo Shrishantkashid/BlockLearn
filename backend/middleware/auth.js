@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const pool = require('../config/database');
+const { connectDB } = require('../config/database');
 
 const authenticateToken = async (req, res, next) => {
   try {
@@ -15,17 +15,22 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
     
     // Verify user still exists
-    const userQuery = 'SELECT id, email, campus_verified FROM users WHERE id = $1';
-    const userResult = await pool.query(userQuery, [decoded.userId]);
+    const db = await connectDB();
+    const collection = db.collection('users');
+    const user = await collection.findOne({ _id: decoded.userId });
     
-    if (userResult.rows.length === 0) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token'
       });
     }
 
-    req.user = userResult.rows[0];
+    req.user = {
+      id: user._id,
+      email: user.email,
+      campus_verified: user.campus_verified
+    };
     next();
   } catch (error) {
     console.error('Auth middleware error:', error);

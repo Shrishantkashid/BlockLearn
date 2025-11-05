@@ -4,7 +4,7 @@ title Start Mini Project
 REM -------------------------
 REM Backend Setup
 REM -------------------------
-cd /d C:\Users\Admin\OneDrive\Desktop\Mini Project\backend
+cd /d C:\Users\Admin\OneDrive\Desktop\mini project 2\Mini-project\backend
 
 echo Checking backend dependencies...
 if not exist node_modules (
@@ -15,13 +15,12 @@ if not exist node_modules (
 )
 
 echo Starting Backend server...
-start cmd /k "cd /d C:\Users\Admin\OneDrive\Desktop\Mini Project\backend && npm run dev"
+start cmd /k "cd /d C:\Users\Admin\OneDrive\Desktop\mini project 2\Mini-project\backend && npm run dev"
 
 REM -------------------------
 REM Frontend Setup
 REM -------------------------
-cd /d C:\Users\Admin\OneDrive\Desktop\Mini Project\frontend
-
+cd /d C:\Users\Admin\OneDrive\Desktop\mini project 2\Mini-project\frontend
 echo Checking frontend dependencies...
 if not exist node_modules (
     echo Installing frontend dependencies...
@@ -31,7 +30,7 @@ if not exist node_modules (
 )
 
 echo Starting Frontend server...
-start cmd /k "cd /d C:\Users\Admin\OneDrive\Desktop\Mini Project\frontend && npm run dev"
+start cmd /k "cd /d C:\Users\Admin\OneDrive\Desktop\mini project 2\Mini-project\frontend && npm run dev"
 
 echo Both servers are starting...
 pause

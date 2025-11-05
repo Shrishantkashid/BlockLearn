@@ -1,6 +1,6 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
-const pool = require("../config/database");
+const { connectDB } = require("../config/database");
 const MatchingService = require("../utils/matchingService");
 
 const router = express.Router();
@@ -10,73 +10,67 @@ router.get("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const query = `
-      SELECT
-        s.id,
-        s.scheduled_at,
-        s.duration_minutes,
-        s.status,
-        s.meeting_link,
-        s.location,
-        s.notes,
-        s.created_at,
-        s.updated_at,
-        -- Student info
-        student.id as student_id,
-        student.first_name as student_first_name,
-        student.last_name as student_last_name,
-        student.email as student_email,
-        -- Mentor info
-        mentor.id as mentor_id,
-        mentor.first_name as mentor_first_name,
-        mentor.last_name as mentor_last_name,
-        mentor.email as mentor_email,
-        -- Skill info
-        skill.id as skill_id,
-        skill.name as skill_name,
-        skill.category as skill_category
-      FROM sessions s
-      JOIN users student ON s.student_id = student.id
-      JOIN users mentor ON s.mentor_id = mentor.id
-      JOIN skills skill ON s.skill_id = skill.id
-      WHERE s.student_id = $1 OR s.mentor_id = $1
-      ORDER BY s.scheduled_at DESC
-    `;
+    // Get database connection
+    const db = await connectDB();
+    
+    // Since MongoDB doesn't support JOINs, we'll need to fetch data in multiple queries
+    const sessionsCollection = db.collection('sessions');
+    const usersCollection = db.collection('users');
+    const skillsCollection = db.collection('skills');
+    
+    // Find sessions where user is either student or mentor
+    const sessions = await sessionsCollection.find({
+      $or: [
+        { student_id: userId },
+        { mentor_id: userId }
+      ]
+    }).sort({ scheduled_at: -1 }).toArray();
 
-    const result = await pool.query(query, [userId]);
-
-    const sessions = result.rows.map(row => ({
-      id: row.id,
-      scheduled_at: row.scheduled_at,
-      duration_minutes: row.duration_minutes,
-      status: row.status,
-      meeting_link: row.meeting_link,
-      location: row.location,
-      notes: row.notes,
-      created_at: row.created_at,
-      updated_at: row.updated_at,
-      student: {
-        id: row.student_id,
-        first_name: row.student_first_name,
-        last_name: row.student_last_name,
-        email: row.student_email
-      },
-      mentor: {
-        id: row.mentor_id,
-        first_name: row.mentor_first_name,
-        last_name: row.mentor_last_name,
-        email: row.mentor_email
-      },
-      skill: {
-        id: row.skill_id,
-        name: row.skill_name,
-        category: row.skill_category
-      }
-    }));
+    // Enrich sessions with user and skill data
+    const enrichedSessions = [];
+    for (const session of sessions) {
+      // Get student info
+      const student = await usersCollection.findOne({ _id: session.student_id });
+      
+      // Get mentor info
+      const mentor = await usersCollection.findOne({ _id: session.mentor_id });
+      
+      // Get skill info
+      const skill = await skillsCollection.findOne({ _id: session.skill_id });
+      
+      enrichedSessions.push({
+        id: session._id,
+        scheduled_at: session.scheduled_at,
+        duration_minutes: session.duration_minutes,
+        status: session.status,
+        meeting_link: session.meeting_link,
+        location: session.location,
+        notes: session.notes,
+        created_at: session.created_at,
+        updated_at: session.updated_at,
+        student: {
+          id: student ? student._id : null,
+          first_name: student ? student.first_name : null,
+          last_name: student ? student.last_name : null,
+          email: student ? student.email : null
+        },
+        mentor: {
+          id: mentor ? mentor._id : null,
+          first_name: mentor ? mentor.first_name : null,
+          last_name: mentor ? mentor.last_name : null,
+          email: mentor ? mentor.email : null
+        },
+        skill: {
+          id: skill ? skill._id : null,
+          name: skill ? skill.name : null,
+          category: skill ? skill.category : null
+        }
+      });
+    }
 
     res.json({
       success: true,
-      data: sessions
+      data: enrichedSessions
     });
 
   } catch (error) {
@@ -109,16 +103,22 @@ router.post("/", authenticateToken, async (req, res) => {
       });
     }
 
-    // Verify the mentor exists and offers the requested skill
-    const mentorCheckQuery = `
-      SELECT u.id, u.first_name, u.last_name, u.email
-      FROM users u
-      JOIN user_skills us ON u.id = us.user_id
-      WHERE u.id = $1 AND us.skill_id = $2 AND us.skill_type = 'offered'
-    `;
-    const mentorCheck = await pool.query(mentorCheckQuery, [mentor_id, skill_id]);
+    // Get database connection
+    const db = await connectDB();
+    const usersCollection = db.collection('users');
+    const skillsCollection = db.collection('skills');
+    const sessionsCollection = db.collection('sessions');
+    const userSkillsCollection = db.collection('user_skills');
 
-    if (mentorCheck.rows.length === 0) {
+    // Verify the mentor exists and offers the requested skill
+    const mentor = await usersCollection.findOne({ _id: mentor_id });
+    const mentorSkill = await userSkillsCollection.findOne({ 
+      user_id: mentor_id, 
+      skill_id: skill_id, 
+      skill_type: 'offered' 
+    });
+
+    if (!mentor || !mentorSkill) {
       return res.status(400).json({
         success: false,
         message: "Mentor not found or doesn't offer the requested skill"
@@ -126,10 +126,9 @@ router.post("/", authenticateToken, async (req, res) => {
     }
 
     // Verify the skill exists
-    const skillCheckQuery = "SELECT id, name FROM skills WHERE id = $1";
-    const skillCheck = await pool.query(skillCheckQuery, [skill_id]);
+    const skill = await skillsCollection.findOne({ _id: skill_id });
 
-    if (skillCheck.rows.length === 0) {
+    if (!skill) {
       return res.status(400).json({
         success: false,
         message: "Skill not found"
@@ -137,31 +136,31 @@ router.post("/", authenticateToken, async (req, res) => {
     }
 
     // Create the session
-    const insertQuery = `
-      INSERT INTO sessions (
-        student_id, mentor_id, skill_id, scheduled_at, duration_minutes,
-        meeting_link, location, notes
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *
-    `;
+    const newSession = {
+      student_id: userId,
+      mentor_id: mentor_id,
+      skill_id: skill_id,
+      scheduled_at: new Date(scheduled_at),
+      duration_minutes: duration_minutes,
+      status: 'scheduled',
+      meeting_link: meeting_link,
+      location: location,
+      notes: notes,
+      created_at: new Date(),
+      updated_at: new Date()
+    };
 
-    const result = await pool.query(insertQuery, [
-      userId, mentor_id, skill_id, scheduled_at, duration_minutes,
-      meeting_link, location, notes
-    ]);
-
-    const session = result.rows[0];
-    const skill = skillCheck.rows[0];
-    const mentor = mentorCheck.rows[0];
+    const result = await sessionsCollection.insertOne(newSession);
+    const session = { ...newSession, _id: result.insertedId };
 
     // Record session outcome (initially connected = true since session was created)
-    await MatchingService.recordSessionOutcome(session.id, true);
+    await MatchingService.recordSessionOutcome(session._id, true);
 
     res.status(201).json({
       success: true,
       message: "Session created successfully",
       data: {
-        id: session.id,
+        id: session._id,
         scheduled_at: session.scheduled_at,
         duration_minutes: session.duration_minutes,
         status: session.status,
@@ -177,13 +176,13 @@ router.post("/", authenticateToken, async (req, res) => {
           email: req.user.email
         },
         mentor: {
-          id: mentor.id,
+          id: mentor._id,
           first_name: mentor.first_name,
           last_name: mentor.last_name,
           email: mentor.email
         },
         skill: {
-          id: skill.id,
+          id: skill._id,
           name: skill.name
         }
       }
@@ -204,76 +203,68 @@ router.get("/:session_id", authenticateToken, async (req, res) => {
     const { session_id } = req.params;
     const userId = req.user.id;
 
-    const query = `
-      SELECT
-        s.id,
-        s.scheduled_at,
-        s.duration_minutes,
-        s.status,
-        s.meeting_link,
-        s.location,
-        s.notes,
-        s.created_at,
-        s.updated_at,
-        -- Student info
-        student.id as student_id,
-        student.first_name as student_first_name,
-        student.last_name as student_last_name,
-        student.email as student_email,
-        -- Mentor info
-        mentor.id as mentor_id,
-        mentor.first_name as mentor_first_name,
-        mentor.last_name as mentor_last_name,
-        mentor.email as mentor_email,
-        -- Skill info
-        skill.id as skill_id,
-        skill.name as skill_name,
-        skill.category as skill_category
-      FROM sessions s
-      JOIN users student ON s.student_id = student.id
-      JOIN users mentor ON s.mentor_id = mentor.id
-      JOIN skills skill ON s.skill_id = skill.id
-      WHERE s.id = $1 AND (s.student_id = $2 OR s.mentor_id = $2)
-    `;
+    // Get database connection
+    const db = await connectDB();
+    const sessionsCollection = db.collection('sessions');
+    const usersCollection = db.collection('users');
+    const skillsCollection = db.collection('skills');
+    
+    // Convert session_id to ObjectId if it's a string
+    const sessionIdObj = typeof session_id === 'string' ? session_id : session_id;
 
-    const result = await pool.query(query, [session_id, userId]);
+    // Find session where user is either student or mentor
+    const session = await sessionsCollection.findOne({
+      _id: sessionIdObj,
+      $or: [
+        { student_id: userId },
+        { mentor_id: userId }
+      ]
+    });
 
-    if (result.rows.length === 0) {
+    if (!session) {
       return res.status(404).json({
         success: false,
         message: "Session not found or not authorized"
       });
     }
 
-    const row = result.rows[0];
+    // Get student info
+    const student = await usersCollection.findOne({ _id: session.student_id });
+    
+    // Get mentor info
+    const mentor = await usersCollection.findOne({ _id: session.mentor_id });
+    
+    // Get skill info
+    const skill = await skillsCollection.findOne({ _id: session.skill_id });
+
     res.json({
       success: true,
       data: {
-        id: row.id,
-        scheduled_at: row.scheduled_at,
-        duration_minutes: row.duration_minutes,
-        status: row.status,
-        meeting_link: row.meeting_link,
-        location: row.location,
-        notes: row.notes,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
+        id: session._id,
+        scheduled_at: session.scheduled_at,
+        duration_minutes: session.duration_minutes,
+        status: session.status,
+        meeting_link: session.meeting_link,
+        location: session.location,
+        notes: session.notes,
+        created_at: session.created_at,
+        updated_at: session.updated_at,
         student: {
-          id: row.student_id,
-          first_name: row.student_first_name,
-          last_name: row.student_last_name,
-          email: row.student_email
+          id: student ? student._id : null,
+          first_name: student ? student.first_name : null,
+          last_name: student ? student.last_name : null,
+          email: student ? student.email : null
         },
         mentor: {
-          id: row.mentor_id,
-          first_name: row.mentor_first_name,
-          last_name: row.mentor_last_name,
-          email: row.mentor_email
+          id: mentor ? mentor._id : null,
+          first_name: mentor ? mentor.first_name : null,
+          last_name: mentor ? mentor.last_name : null,
+          email: mentor ? mentor.email : null
         },
         skill: {
-          id: row.skill_id,
-          name: row.skill_name,
-          category: row.skill_category
+          id: skill ? skill._id : null,
+          name: skill ? skill.name : null,
+          category: skill ? skill.category : null
         }
       }
     });

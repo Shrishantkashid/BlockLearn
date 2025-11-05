@@ -4,17 +4,15 @@
  */
 
 // Import required modules
-const { Pool } = require('pg');
+const { MongoClient } = require('mongodb');
 require('dotenv').config();
 
-// Database configuration
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+// MongoDB configuration
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://<username>:<password>@cluster.mongodb.net/blocklearn?retryWrites=true&w=majority';
 
 // Test data
 const testStudent = {
-  userId: 1,
+  userId: "1",
   firstName: "Alice",
   lastName: "Student",
   campus: "Main Campus",
@@ -26,7 +24,7 @@ const testStudent = {
 };
 
 const testMentor = {
-  userId: 2,
+  userId: "2",
   firstName: "Bob",
   lastName: "Mentor",
   campus: "Main Campus",
@@ -38,7 +36,7 @@ const testMentor = {
 };
 
 const testSessionRequest = {
-  skillId: 1
+  skillId: "1"
 };
 
 /**
@@ -141,25 +139,27 @@ function calculateAvailabilityOverlap(studentAvailability, mentorAvailability) {
 
 // Run the test
 async function runTest() {
-  console.log("=== BlockLearn Matching System Test ===");
-  console.log("Testing match between:");
-  console.log(`Student: ${testStudent.firstName} ${testStudent.lastName}`);
-  console.log(`Mentor: ${testMentor.firstName} ${testMentor.lastName}`);
-  console.log("");
+  let client;
+  try {
+    console.log("=== BlockLearn Matching System Test ===");
+    console.log("Testing match between:");
+    console.log(`Student: ${testStudent.firstName} ${testStudent.lastName}`);
+    console.log(`Mentor: ${testMentor.firstName} ${testMentor.lastName}`);
+    console.log("");
 
-  const matchScore = await calculateMatchScore(testStudent, testMentor, testSessionRequest);
-  
-  console.log("");
-  console.log("=== Match Results ===");
-  console.log(`Total Match Score: ${matchScore.totalScore * 100}%`);
-  console.log("");
-  console.log("Score Breakdown:");
-  Object.entries(matchScore.breakdown).forEach(([factor, data]) => {
-    console.log(`  ${factor}: ${data.score * 100}% (weight: ${data.weight * 100}%, contribution: ${data.contribution * 100}%)`);
-  });
-  
-  // Close database connection
-  await pool.end();
+    const matchScore = await calculateMatchScore(testStudent, testMentor, testSessionRequest);
+    
+    console.log("");
+    console.log("=== Match Results ===");
+    console.log(`Total Match Score: ${matchScore.totalScore * 100}%`);
+    console.log("");
+    console.log("Score Breakdown:");
+    Object.entries(matchScore.breakdown).forEach(([factor, data]) => {
+      console.log(`  ${factor}: ${data.score * 100}% (weight: ${data.weight * 100}%, contribution: ${data.contribution * 100}%)`);
+    });
+  } catch (error) {
+    console.error("Error running test:", error);
+  }
 }
 
 // Execute the test

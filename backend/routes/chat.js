@@ -1,6 +1,6 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
-const pool = require("../config/database");
+const { connectDB } = require("../config/database");
 const OpenAI = require("openai");
 const { translate, getTranslatedResponse } = require("../utils/translation");
 
@@ -98,60 +98,107 @@ const getTranslatedRuleResponse = (message, language) => {
 // Get user context for personalized responses
 const getUserContext = async (userId) => {
   try {
-    // Get user's skills, sessions, and profile data
-    const userData = await pool.query(`
-      SELECT
-        u.first_name, u.last_name,
-        up.bio, up.department, up.year_of_study,
-        json_agg(DISTINCT
-          json_build_object(
-            'skill_name', s.name,
-            'skill_type', us.skill_type,
-            'proficiency_level', us.proficiency_level
-          )
-        ) as skills,
-        COUNT(DISTINCT sess.id) as total_sessions,
-        AVG(fb.student_rating) as avg_student_rating,
-        AVG(fb.mentor_rating) as avg_mentor_rating
-      FROM users u
-      LEFT JOIN user_profiles up ON u.id = up.user_id
-      LEFT JOIN user_skills us ON u.id = us.user_id
-      LEFT JOIN skills s ON us.skill_id = s.id
-      LEFT JOIN sessions sess ON (u.id = sess.student_id OR u.id = sess.mentor_id)
-      LEFT JOIN feedback_sessions fb ON sess.id = fb.session_id
-      WHERE u.id = $1
-      GROUP BY u.id, up.id
-    `, [userId]);
+    // Get database connection
+    const db = await connectDB();
+    const usersCollection = db.collection('users');
+    const profilesCollection = db.collection('user_profiles');
+    const userSkillsCollection = db.collection('user_skills');
+    const skillsCollection = db.collection('skills');
+    const sessionsCollection = db.collection('sessions');
+    const feedbackSessionsCollection = db.collection('feedback_sessions');
 
-    if (userData.rows.length === 0) {
-      return null;
+    // Get user data
+    const user = await usersCollection.findOne({ _id: userId });
+    if (!user) return null;
+
+    const profile = await profilesCollection.findOne({ user_id: userId });
+
+    // Get user's skills
+    const userSkills = await userSkillsCollection.find({ user_id: userId }).toArray();
+    
+    // Enrich skills with names
+    const enrichedSkills = [];
+    for (const skill of userSkills) {
+      const skillInfo = await skillsCollection.findOne({ _id: skill.skill_id });
+      enrichedSkills.push({
+        skill_name: skillInfo ? skillInfo.name : 'Unknown',
+        skill_type: skill.skill_type,
+        proficiency_level: skill.proficiency_level
+      });
     }
 
-    const user = userData.rows[0];
+    // Get session data
+    const sessions = await sessionsCollection.find({
+      $or: [
+        { student_id: userId },
+        { mentor_id: userId }
+      ]
+    }).toArray();
 
-    // Get recent session activity
-    const recentSessions = await pool.query(`
-      SELECT
-        sess.skill_id, s.name as skill_name, sess.status,
-        sess.created_at, sess.scheduled_at
-      FROM sessions sess
-      JOIN skills s ON sess.skill_id = s.id
-      WHERE (sess.student_id = $1 OR sess.mentor_id = $1)
-        AND sess.created_at >= NOW() - INTERVAL '30 days'
-      ORDER BY sess.created_at DESC
-      LIMIT 5
-    `, [userId]);
+    // Get feedback data
+    const feedbackSessions = [];
+    for (const session of sessions) {
+      const feedback = await feedbackSessionsCollection.findOne({ session_id: session._id });
+      if (feedback) {
+        feedbackSessions.push(feedback);
+      }
+    }
+
+    // Calculate averages
+    let totalStudentRating = 0;
+    let totalMentorRating = 0;
+    let studentRatingCount = 0;
+    let mentorRatingCount = 0;
+
+    feedbackSessions.forEach(fb => {
+      if (fb.student_rating) {
+        totalStudentRating += fb.student_rating;
+        studentRatingCount++;
+      }
+      if (fb.mentor_rating) {
+        totalMentorRating += fb.mentor_rating;
+        mentorRatingCount++;
+      }
+    });
+
+    const avgStudentRating = studentRatingCount > 0 ? totalStudentRating / studentRatingCount : 0;
+    const avgMentorRating = mentorRatingCount > 0 ? totalMentorRating / mentorRatingCount : 0;
+
+    // Get recent session activity (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const recentSessions = await sessionsCollection.find({
+      $or: [
+        { student_id: userId },
+        { mentor_id: userId }
+      ],
+      created_at: { $gte: thirtyDaysAgo }
+    }).sort({ created_at: -1 }).limit(5).toArray();
+
+    // Enrich recent sessions with skill names
+    const enrichedRecentSessions = [];
+    for (const session of recentSessions) {
+      const skill = await skillsCollection.findOne({ _id: session.skill_id });
+      enrichedRecentSessions.push({
+        skill_id: session.skill_id,
+        skill_name: skill ? skill.name : 'Unknown',
+        status: session.status,
+        created_at: session.created_at,
+        scheduled_at: session.scheduled_at
+      });
+    }
 
     return {
       name: `${user.first_name} ${user.last_name}`,
-      bio: user.bio,
-      department: user.department,
-      year_of_study: user.year_of_study,
-      skills: user.skills || [],
-      total_sessions: parseInt(user.total_sessions) || 0,
-      avg_student_rating: parseFloat(user.avg_student_rating) || 0,
-      avg_mentor_rating: parseFloat(user.avg_mentor_rating) || 0,
-      recent_activity: recentSessions.rows
+      bio: profile ? profile.bio : null,
+      department: profile ? profile.department : null,
+      year_of_study: profile ? profile.year_of_study : null,
+      skills: enrichedSkills,
+      total_sessions: sessions.length,
+      avg_student_rating: avgStudentRating,
+      avg_mentor_rating: avgMentorRating,
+      recent_activity: enrichedRecentSessions
     };
   } catch (error) {
     console.error("Error getting user context:", error);
@@ -310,14 +357,24 @@ router.post("/conversation", authenticateToken, async (req, res) => {
     const userId = req.user.id;
     const { title } = req.body;
 
-    const result = await pool.query(
-      "INSERT INTO chat_conversations (user_id, title) VALUES ($1, $2) RETURNING *",
-      [userId, title || "New Conversation"]
-    );
+    // Get database connection
+    const db = await connectDB();
+    const collection = db.collection('chat_conversations');
+
+    const newConversation = {
+      user_id: userId,
+      title: title || "New Conversation",
+      status: 'active',
+      created_at: new Date(),
+      updated_at: new Date()
+    };
+
+    const result = await collection.insertOne(newConversation);
+    const conversation = { ...newConversation, _id: result.insertedId };
 
     res.json({
       success: true,
-      data: result.rows[0]
+      data: conversation
     });
 
   } catch (error) {
@@ -342,56 +399,74 @@ router.post("/message", authenticateToken, async (req, res) => {
       });
     }
 
+    // Get database connection
+    const db = await connectDB();
+    const conversationsCollection = db.collection('chat_conversations');
+    const messagesCollection = db.collection('chat_messages');
+
     // Get or create conversation
     let conversationId = conversation_id;
     if (!conversationId) {
-      const convResult = await pool.query(
-        "INSERT INTO chat_conversations (user_id, title) VALUES ($1, $2) RETURNING id",
-        [userId, "New Conversation"]
-      );
-      conversationId = convResult.rows[0].id;
+      const newConversation = {
+        user_id: userId,
+        title: "New Conversation",
+        status: 'active',
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+
+      const convResult = await conversationsCollection.insertOne(newConversation);
+      conversationId = convResult.insertedId;
     }
 
     // Save user message
-    await pool.query(
-      "INSERT INTO chat_messages (conversation_id, sender_type, message) VALUES ($1, $2, $3)",
-      [conversationId, 'user', message.trim()]
-    );
+    await messagesCollection.insertOne({
+      conversation_id: conversationId,
+      sender_type: 'user',
+      message: message.trim(),
+      timestamp: new Date(),
+      metadata: {}
+    });
 
     // Generate bot response using enhanced AI
     const botResponse = await getContextualResponse(message.trim(), userId);
 
     // Save bot message with metadata
-    await pool.query(
-      "INSERT INTO chat_messages (conversation_id, sender_type, message, metadata) VALUES ($1, $2, $3, $4)",
-      [conversationId, 'bot', botResponse, JSON.stringify({
+    await messagesCollection.insertOne({
+      conversation_id: conversationId,
+      sender_type: 'bot',
+      message: botResponse,
+      timestamp: new Date(),
+      metadata: {
         confidence: openai ? 'high' : 'medium',
         type: openai ? 'ai_powered' : 'enhanced_rule_based',
         has_user_context: !!userId
-      })]
-    );
+      }
+    });
 
     // Get conversation with messages
-    const conversationResult = await pool.query(`
-      SELECT cc.*, json_agg(
-        json_build_object(
-          'id', cm.id,
-          'sender_type', cm.sender_type,
-          'message', cm.message,
-          'timestamp', cm.timestamp,
-          'metadata', cm.metadata
-        ) ORDER BY cm.timestamp
-      ) as messages
-      FROM chat_conversations cc
-      LEFT JOIN chat_messages cm ON cc.id = cm.conversation_id
-      WHERE cc.id = $1 AND cc.user_id = $2
-      GROUP BY cc.id
-    `, [conversationId, userId]);
+    const conversation = await conversationsCollection.findOne({ _id: conversationId, user_id: userId });
+    
+    if (conversation) {
+      const messages = await messagesCollection.find({ conversation_id: conversationId })
+        .sort({ timestamp: 1 })
+        .toArray();
+      
+      const conversationWithMessages = {
+        ...conversation,
+        messages: messages
+      };
 
-    res.json({
-      success: true,
-      data: conversationResult.rows[0]
-    });
+      res.json({
+        success: true,
+        data: conversationWithMessages
+      });
+    } else {
+      res.json({
+        success: true,
+        data: { _id: conversationId, messages: [] }
+      });
+    }
 
   } catch (error) {
     console.error("Error sending message:", error);
@@ -407,26 +482,32 @@ router.get("/conversations", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const result = await pool.query(`
-      SELECT cc.*, json_agg(
-        json_build_object(
-          'id', cm.id,
-          'sender_type', cm.sender_type,
-          'message', cm.message,
-          'timestamp', cm.timestamp,
-          'metadata', cm.metadata
-        ) ORDER BY cm.timestamp
-      ) as messages
-      FROM chat_conversations cc
-      LEFT JOIN chat_messages cm ON cc.id = cm.conversation_id
-      WHERE cc.user_id = $1
-      GROUP BY cc.id
-      ORDER BY cc.updated_at DESC
-    `, [userId]);
+    // Get database connection
+    const db = await connectDB();
+    const conversationsCollection = db.collection('chat_conversations');
+    const messagesCollection = db.collection('chat_messages');
+
+    // Get all conversations for the user
+    const conversations = await conversationsCollection.find({ user_id: userId })
+      .sort({ updated_at: -1 })
+      .toArray();
+
+    // Enrich conversations with messages
+    const enrichedConversations = [];
+    for (const conversation of conversations) {
+      const messages = await messagesCollection.find({ conversation_id: conversation._id })
+        .sort({ timestamp: 1 })
+        .toArray();
+      
+      enrichedConversations.push({
+        ...conversation,
+        messages: messages
+      });
+    }
 
     res.json({
       success: true,
-      data: result.rows
+      data: enrichedConversations
     });
 
   } catch (error) {
@@ -444,32 +525,36 @@ router.get("/conversation/:conversation_id", authenticateToken, async (req, res)
     const { conversation_id } = req.params;
     const userId = req.user.id;
 
-    const result = await pool.query(`
-      SELECT cc.*, json_agg(
-        json_build_object(
-          'id', cm.id,
-          'sender_type', cm.sender_type,
-          'message', cm.message,
-          'timestamp', cm.timestamp,
-          'metadata', cm.metadata
-        ) ORDER BY cm.timestamp
-      ) as messages
-      FROM chat_conversations cc
-      LEFT JOIN chat_messages cm ON cc.id = cm.conversation_id
-      WHERE cc.id = $1 AND cc.user_id = $2
-      GROUP BY cc.id
-    `, [conversation_id, userId]);
+    // Get database connection
+    const db = await connectDB();
+    const conversationsCollection = db.collection('chat_conversations');
+    const messagesCollection = db.collection('chat_messages');
 
-    if (result.rows.length === 0) {
+    const conversation = await conversationsCollection.findOne({ 
+      _id: conversation_id, 
+      user_id: userId 
+    });
+
+    if (!conversation) {
       return res.status(404).json({
         success: false,
         message: "Conversation not found"
       });
     }
 
+    // Get messages for this conversation
+    const messages = await messagesCollection.find({ conversation_id: conversation_id })
+      .sort({ timestamp: 1 })
+      .toArray();
+
+    const conversationWithMessages = {
+      ...conversation,
+      messages: messages
+    };
+
     res.json({
       success: true,
-      data: result.rows[0]
+      data: conversationWithMessages
     });
 
   } catch (error) {
@@ -487,21 +572,32 @@ router.put("/conversation/:conversation_id/close", authenticateToken, async (req
     const { conversation_id } = req.params;
     const userId = req.user.id;
 
-    const result = await pool.query(
-      "UPDATE chat_conversations SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2 RETURNING *",
-      [conversation_id, userId]
+    // Get database connection
+    const db = await connectDB();
+    const collection = db.collection('chat_conversations');
+
+    const result = await collection.updateOne(
+      { _id: conversation_id, user_id: userId },
+      { 
+        $set: { 
+          status: 'closed', 
+          updated_at: new Date() 
+        } 
+      }
     );
 
-    if (result.rows.length === 0) {
+    if (result.matchedCount === 0) {
       return res.status(404).json({
         success: false,
         message: "Conversation not found"
       });
     }
 
+    const updatedConversation = await collection.findOne({ _id: conversation_id });
+
     res.json({
       success: true,
-      data: result.rows[0]
+      data: updatedConversation
     });
 
   } catch (error) {
@@ -519,52 +615,14 @@ router.get("/analytics", authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     // Get comprehensive user analytics
-    const analyticsResult = await pool.query(`
-      SELECT
-        -- Basic user info
-        u.first_name, u.last_name,
-        up.department, up.year_of_study,
+    const analytics = await getUserContext(userId);
 
-        -- Skill statistics
-        COUNT(DISTINCT CASE WHEN us.skill_type = 'offered' THEN us.skill_id END) as skills_offered,
-        COUNT(DISTINCT CASE WHEN us.skill_type = 'needed' THEN us.skill_id END) as skills_needed,
-        AVG(us.proficiency_level) as avg_proficiency,
-
-        -- Session statistics
-        COUNT(DISTINCT s.id) as total_sessions,
-        COUNT(DISTINCT CASE WHEN s.status = 'completed' THEN s.id END) as completed_sessions,
-        AVG(fb.student_rating) as avg_rating_received,
-        AVG(fb.mentor_rating) as avg_rating_given,
-
-        -- Recent activity (last 30 days)
-        COUNT(DISTINCT CASE WHEN s.created_at >= NOW() - INTERVAL '30 days' THEN s.id END) as recent_sessions,
-
-        -- Popular skills in user's network
-        (SELECT json_agg(DISTINCT s2.name ORDER BY COUNT(*) DESC)
-         FROM sessions s2
-         JOIN skills s3 ON s2.skill_id = s3.id
-         WHERE s2.student_id = u.id OR s2.mentor_id = u.id
-         GROUP BY s3.name
-         ORDER BY COUNT(*) DESC
-         LIMIT 5) as popular_skills
-
-      FROM users u
-      LEFT JOIN user_profiles up ON u.id = up.user_id
-      LEFT JOIN user_skills us ON u.id = us.user_id
-      LEFT JOIN sessions s ON (u.id = s.student_id OR u.id = s.mentor_id)
-      LEFT JOIN feedback_sessions fb ON s.id = fb.session_id
-      WHERE u.id = $1
-      GROUP BY u.id, up.id
-    `, [userId]);
-
-    if (analyticsResult.rows.length === 0) {
+    if (!analytics) {
       return res.status(404).json({
         success: false,
         message: "User not found"
       });
     }
-
-    const analytics = analyticsResult.rows[0];
 
     // Generate personalized recommendations
     const recommendations = generatePersonalizedRecommendations(analytics);
@@ -573,23 +631,25 @@ router.get("/analytics", authenticateToken, async (req, res) => {
       success: true,
       data: {
         user: {
-          name: `${analytics.first_name} ${analytics.last_name}`,
+          name: analytics.name,
           department: analytics.department,
           year_of_study: analytics.year_of_study
         },
         skills: {
-          offered: parseInt(analytics.skills_offered) || 0,
-          needed: parseInt(analytics.skills_needed) || 0,
-          avg_proficiency: parseFloat(analytics.avg_proficiency) || 0
+          offered: analytics.skills.filter(s => s.skill_type === 'offered').length,
+          needed: analytics.skills.filter(s => s.skill_type === 'needed').length,
+          avg_proficiency: analytics.skills.length > 0 
+            ? analytics.skills.reduce((sum, s) => sum + s.proficiency_level, 0) / analytics.skills.length 
+            : 0
         },
         sessions: {
-          total: parseInt(analytics.total_sessions) || 0,
-          completed: parseInt(analytics.completed_sessions) || 0,
-          recent: parseInt(analytics.recent_sessions) || 0,
-          avg_rating_received: parseFloat(analytics.avg_rating_received) || 0,
-          avg_rating_given: parseFloat(analytics.avg_rating_given) || 0
+          total: analytics.total_sessions,
+          completed: analytics.recent_activity.filter(s => s.status === 'completed').length,
+          recent: analytics.recent_activity.length,
+          avg_rating_received: analytics.avg_student_rating,
+          avg_rating_given: analytics.avg_mentor_rating
         },
-        popular_skills: analytics.popular_skills || [],
+        popular_skills: [], // Would need more complex aggregation in a full implementation
         recommendations: recommendations
       }
     });
@@ -607,8 +667,12 @@ router.get("/analytics", authenticateToken, async (req, res) => {
 const generatePersonalizedRecommendations = (analytics) => {
   const recommendations = [];
 
+  // Count offered and needed skills
+  const offeredSkills = analytics.skills.filter(s => s.skill_type === 'offered').length;
+  const neededSkills = analytics.skills.filter(s => s.skill_type === 'needed').length;
+
   // Skill-based recommendations
-  if (analytics.skills_offered > 0 && analytics.avg_rating_received > 4.0) {
+  if (offeredSkills > 0 && analytics.avg_student_rating > 4.0) {
     recommendations.push({
       type: "mentor",
       title: "You're an excellent mentor!",
@@ -617,7 +681,7 @@ const generatePersonalizedRecommendations = (analytics) => {
     });
   }
 
-  if (analytics.skills_needed > analytics.skills_offered) {
+  if (neededSkills > offeredSkills) {
     recommendations.push({
       type: "learning",
       title: "Focus on your learning goals",
@@ -627,7 +691,7 @@ const generatePersonalizedRecommendations = (analytics) => {
   }
 
   // Session-based recommendations
-  if (analytics.completed_sessions < 3) {
+  if (analytics.total_sessions < 3) {
     recommendations.push({
       type: "engagement",
       title: "Start your learning journey",
@@ -636,17 +700,8 @@ const generatePersonalizedRecommendations = (analytics) => {
     });
   }
 
-  if (analytics.avg_rating_given > 4.5) {
-    recommendations.push({
-      type: "feedback",
-      title: "You're very generous with feedback",
-      description: "Your detailed feedback helps improve the platform. Consider becoming a mentor to share your expertise.",
-      priority: "medium"
-    });
-  }
-
   // Progress-based recommendations
-  if (analytics.recent_sessions === 0 && analytics.total_sessions > 0) {
+  if (analytics.recent_activity.length === 0 && analytics.total_sessions > 0) {
     recommendations.push({
       type: "reengagement",
       title: "Welcome back!",

@@ -6,6 +6,7 @@
     "seed-matching": "node backend/seed-matching-data.js"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
@@ -14,9 +15,9 @@
     "google-auth-library": "^10.4.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.20.0",
     "nodemailer": "^7.0.6",
-    "openai": "^6.1.0",
-    "pg": "^8.16.3"
+    "openai": "^6.1.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

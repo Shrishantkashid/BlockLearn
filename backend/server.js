@@ -4,6 +4,9 @@ const helmet = require('helmet');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
+// Initialize MongoDB connection
+const { connectDB } = require('./config/database');
+
 const authRoutes = require('./routes/auth');
 const feedbackRoutes = require('./routes/feedback');
 const chatRoutes = require('./routes/chat');
@@ -13,6 +16,15 @@ const matchingRoutes = require('./routes/matching');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Test MongoDB connection on startup
+connectDB().then(db => {
+  if (db) {
+    console.log('✅ Database connection ready');
+  }
+}).catch(err => {
+  console.error('❌ Database connection failed:', err.message);
+});
 
 // Middleware
 app.use(helmet());
@@ -33,7 +45,11 @@ app.use('/api/matching', matchingRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ message: 'BlockLearn API is running!' });
+  res.json({ 
+    message: 'BlockLearn API is running!',
+    timestamp: new Date().toISOString(),
+    database: process.env.MONGODB_URI ? 'configured' : 'not configured'
+  });
 });
 
 // Default root route
@@ -50,6 +66,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  console.log(`Health check available at: http://localhost:${PORT}/api/health`);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });

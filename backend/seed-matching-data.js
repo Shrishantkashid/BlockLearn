@@ -3,14 +3,12 @@
  * This script creates sample users, skills, and matching data for training purposes
  */
 
-const { Pool } = require('pg');
+const { MongoClient } = require('mongodb');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
-// Database configuration
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+// MongoDB configuration
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://<username>:<password>@cluster.mongodb.net/blocklearn?retryWrites=true&w=majority';
 
 // Sample data
 const campuses = [
@@ -75,27 +73,39 @@ function generateProficiency() {
 }
 
 async function seedDatabase() {
+  let client;
   try {
     console.log('Starting to seed matching data...');
     
+    // Connect to MongoDB
+    client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    const db = client.db('blocklearn');
+    
+    console.log('Connected to MongoDB');
+    
     // 1. Create sample skills
     console.log('Creating sample skills...');
+    const skillsCollection = db.collection('skills');
+    
     for (const skill of skills) {
-      const skillQuery = `
-        INSERT INTO skills (name, category, created_at)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (name) DO NOTHING
-        RETURNING id
-      `;
-      await pool.query(skillQuery, [skill.name, skill.category]);
+      await skillsCollection.updateOne(
+        { name: skill.name },
+        { $set: { ...skill, created_at: new Date() } },
+        { upsert: true }
+      );
     }
     
-    // Get all skill IDs
-    const skillResult = await pool.query('SELECT id FROM skills');
-    const skillIds = skillResult.rows.map(row => row.id);
+    // Get all skill documents
+    const skillDocs = await skillsCollection.find({}).toArray();
+    const skillIds = skillDocs.map(skill => skill._id);
     
     // 2. Create sample users (30 users)
     console.log('Creating sample users...');
+    const usersCollection = db.collection('users');
+    const profilesCollection = db.collection('user_profiles');
+    const userSkillsCollection = db.collection('user_skills');
+    
     const userIds = [];
     const passwordHash = await bcrypt.hash('password123', 10);
     
@@ -106,37 +116,31 @@ async function seedDatabase() {
       const campus = campuses[Math.floor(Math.random() * campuses.length)];
       
       // Create user
-      const userQuery = `
-        INSERT INTO users (email, password_hash, first_name, last_name, campus_verified, profile_complete, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        RETURNING id
-      `;
-      const userResult = await pool.query(userQuery, [
-        email,
-        passwordHash,
-        firstName,
-        lastName,
-        true,
-        true
-      ]);
+      const userResult = await usersCollection.insertOne({
+        email: email,
+        password_hash: passwordHash,
+        first_name: firstName,
+        last_name: lastName,
+        campus_verified: true,
+        profile_complete: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
       
-      const userId = userResult.rows[0].id;
+      const userId = userResult.insertedId;
       userIds.push(userId);
       
       // Create user profile
-      const profileQuery = `
-        INSERT INTO user_profiles (user_id, bio, campus, year_of_study, department, availability, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-      `;
-      await pool.query(profileQuery, [
-        userId,
-        `I'm passionate about ${skills[Math.floor(Math.random() * skills.length)].name} and love helping others learn.`,
-        campus,
-        Math.floor(Math.random() * 4) + 1, // Year 1-4
-        'Computer Science',
-        generateAvailability(),
-        new Date()
-      ]);
+      await profilesCollection.insertOne({
+        user_id: userId,
+        bio: `I'm passionate about ${skills[Math.floor(Math.random() * skills.length)].name} and love helping others learn.`,
+        campus: campus,
+        year_of_study: Math.floor(Math.random() * 4) + 1, // Year 1-4
+        department: 'Computer Science',
+        availability: generateAvailability(),
+        created_at: new Date(),
+        updated_at: new Date()
+      });
       
       // Assign random skills to user (2-5 skills)
       const userSkillCount = Math.floor(Math.random() * 4) + 2;
@@ -148,18 +152,20 @@ async function seedDatabase() {
         const skillType = Math.random() < 0.7 ? 'offered' : 'needed';
         const proficiency = generateProficiency();
         
-        const userSkillQuery = `
-          INSERT INTO user_skills (user_id, skill_id, skill_type, proficiency_level, description, created_at)
-          VALUES ($1, $2, $3, $4, $5, NOW())
-          ON CONFLICT (user_id, skill_id, skill_type) DO NOTHING
-        `;
-        await pool.query(userSkillQuery, [
-          userId,
-          skillId,
-          skillType,
-          proficiency,
-          `I ${skillType === 'offered' ? 'can teach' : 'want to learn'} this skill at level ${proficiency}`
-        ]);
+        await userSkillsCollection.updateOne(
+          { user_id: userId, skill_id: skillId, skill_type: skillType },
+          { 
+            $set: {
+              user_id: userId,
+              skill_id: skillId,
+              skill_type: skillType,
+              proficiency_level: proficiency,
+              description: `I ${skillType === 'offered' ? 'can teach' : 'want to learn'} this skill at level ${proficiency}`,
+              created_at: new Date()
+            }
+          },
+          { upsert: true }
+        );
       }
     }
     
@@ -167,6 +173,11 @@ async function seedDatabase() {
     
     // 3. Create sample sessions and match history (50 sessions)
     console.log('Creating sample sessions and match history...');
+    const sessionsCollection = db.collection('sessions');
+    const matchHistoryCollection = db.collection('match_history');
+    const sessionOutcomesCollection = db.collection('session_outcomes');
+    const feedbackSessionsCollection = db.collection('feedback_sessions');
+    
     for (let i = 0; i < 50; i++) {
       // Select random student and mentor (ensure they're different)
       const shuffledUsers = [...userIds].sort(() => 0.5 - Math.random());
@@ -174,45 +185,37 @@ async function seedDatabase() {
       const mentorId = shuffledUsers[1];
       
       // Select random skill that mentor offers
-      const mentorSkillsQuery = `
-        SELECT skill_id FROM user_skills 
-        WHERE user_id = $1 AND skill_type = 'offered'
-      `;
-      const mentorSkillsResult = await pool.query(mentorSkillsQuery, [mentorId]);
+      const mentorSkills = await userSkillsCollection.find({ 
+        user_id: mentorId, 
+        skill_type: 'offered' 
+      }).toArray();
       
-      if (mentorSkillsResult.rows.length === 0) continue;
+      if (mentorSkills.length === 0) continue;
       
-      const skillId = mentorSkillsResult.rows[0].skill_id;
+      const skillId = mentorSkills[0].skill_id;
       
       // Create session
       const statusOptions = ['completed', 'scheduled', 'in_progress', 'cancelled'];
       const status = statusOptions[Math.floor(Math.random() * statusOptions.length)];
       
-      const sessionQuery = `
-        INSERT INTO sessions (
-          student_id, mentor_id, skill_id, scheduled_at, duration_minutes, 
-          status, meeting_link, location, notes, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-        RETURNING id
-      `;
-      
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + Math.floor(Math.random() * 30));
       
-      const sessionResult = await pool.query(sessionQuery, [
-        studentId,
-        mentorId,
-        skillId,
-        futureDate,
-        Math.floor(Math.random() * 3) * 30 + 30, // 30, 60, or 90 minutes
-        status,
-        'https://meet.google.com/abc-defg-hij',
-        'Online',
-        'Sample session notes',
-      ]);
+      const sessionResult = await sessionsCollection.insertOne({
+        student_id: studentId,
+        mentor_id: mentorId,
+        skill_id: skillId,
+        scheduled_at: futureDate,
+        duration_minutes: Math.floor(Math.random() * 3) * 30 + 30, // 30, 60, or 90 minutes
+        status: status,
+        meeting_link: 'https://meet.google.com/abc-defg-hij',
+        location: 'Online',
+        notes: 'Sample session notes',
+        created_at: new Date(),
+        updated_at: new Date()
+      });
       
-      const sessionId = sessionResult.rows[0].id;
+      const sessionId = sessionResult.insertedId;
       
       // Create match history (simulate the matching algorithm)
       const matchScore = Math.random(); // Random score between 0 and 1
@@ -245,29 +248,17 @@ async function seedDatabase() {
         }
       };
       
-      const matchHistoryQuery = `
-        INSERT INTO match_history (
-          student_id, mentor_id, skill_id, match_score, score_breakdown, created_at
-        )
-        VALUES ($1, $2, $3, $4, $5, NOW())
-      `;
-      await pool.query(matchHistoryQuery, [
-        studentId,
-        mentorId,
-        skillId,
-        matchScore,
-        JSON.stringify(scoreBreakdown)
-      ]);
+      await matchHistoryCollection.insertOne({
+        student_id: studentId,
+        mentor_id: mentorId,
+        skill_id: skillId,
+        match_score: matchScore,
+        score_breakdown: scoreBreakdown,
+        created_at: new Date()
+      });
       
       // Create session outcome (80% connection rate)
       const connected = Math.random() < 0.8;
-      
-      const sessionOutcomeQuery = `
-        INSERT INTO session_outcomes (
-          session_id, connected, feedback_data, created_at
-        )
-        VALUES ($1, $2, $3, NOW())
-      `;
       
       const feedbackData = connected ? {
         rating: Math.floor(Math.random() * 5) + 1,
@@ -276,33 +267,29 @@ async function seedDatabase() {
         is_student: true
       } : null;
       
-      await pool.query(sessionOutcomeQuery, [
-        sessionId,
-        connected,
-        feedbackData ? JSON.stringify(feedbackData) : null
-      ]);
+      await sessionOutcomesCollection.insertOne({
+        session_id: sessionId,
+        connected: connected,
+        feedback_data: feedbackData,
+        created_at: new Date()
+      });
       
       // Create feedback session (for completed sessions)
       if (status === 'completed' && connected) {
         const studentRating = Math.floor(Math.random() * 5) + 1;
         const mentorRating = Math.floor(Math.random() * 5) + 1;
         
-        const feedbackSessionQuery = `
-          INSERT INTO feedback_sessions (
-            session_id, student_rating, student_feedback_type, student_comment,
-            mentor_rating, mentor_feedback_type, mentor_comment, created_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-        `;
-        await pool.query(feedbackSessionQuery, [
-          sessionId,
-          studentRating,
-          studentRating > 3 ? 'positive' : 'negative',
-          studentRating > 3 ? 'Great mentor, very knowledgeable!' : 'Could improve explanations',
-          mentorRating,
-          mentorRating > 3 ? 'positive' : 'negative',
-          mentorRating > 3 ? 'Engaged student, good questions!' : 'Student seemed disinterested'
-        ]);
+        await feedbackSessionsCollection.insertOne({
+          session_id: sessionId,
+          student_rating: studentRating,
+          student_feedback_type: studentRating > 3 ? 'positive' : 'negative',
+          student_comment: studentRating > 3 ? 'Great mentor, very knowledgeable!' : 'Could improve explanations',
+          mentor_rating: mentorRating,
+          mentor_feedback_type: mentorRating > 3 ? 'positive' : 'negative',
+          mentor_comment: mentorRating > 3 ? 'Engaged student, good questions!' : 'Student seemed disinterested',
+          created_at: new Date(),
+          updated_at: new Date()
+        });
       }
     }
     
@@ -318,7 +305,9 @@ async function seedDatabase() {
   } catch (error) {
     console.error('Error seeding database:', error);
   } finally {
-    await pool.end();
+    if (client) {
+      await client.close();
+    }
   }
 }
 

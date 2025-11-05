@@ -1,7 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
-const pool = require("../config/database");
+const { connectDB } = require("../config/database");
 const { sendOTP } = require("../config/email");
 const nodemailer = require('nodemailer');
 const { generateOTP, isValidCampusEmail } = require("../utils/helper");
@@ -43,7 +43,7 @@ const verifyOtpLimiter = rateLimit({
 // ✅ Send OTP
 router.post("/send-otp", otpLimiter, async (req, res) => {
   try {
-    const { email: rawEmail } = req.body;
+    const { email: rawEmail, firstName, lastName, isNewUser } = req.body;
     const email = String(rawEmail || '').trim();
     console.log('[send-otp] email received:', email);
 
@@ -55,17 +55,37 @@ router.post("/send-otp", otpLimiter, async (req, res) => {
       });
     }
 
+    // Validate names if new user
+    if (isNewUser && (!firstName || !lastName)) {
+      return res.status(400).json({
+        success: false,
+        message: "First name and last name are required for registration",
+      });
+    }
+
     const otp = generateOTP();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+    // Get database connection
+    const db = await connectDB();
+
     // Store OTP in DB
-    const query = `
-      INSERT INTO email_verifications (email, otp, expires_at)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (email) 
-      DO UPDATE SET otp = $2, expires_at = $3, verified = false
-    `;
-    await pool.query(query, [email, otp, expiresAt]);
+    const collection = db.collection('email_verifications');
+    await collection.updateOne(
+      { email: email },
+      { 
+        $set: { 
+          email: email,
+          otp: otp,
+          expires_at: expiresAt,
+          verified: false,
+          first_name: firstName || null,
+          last_name: lastName || null,
+          is_new_user: isNewUser || false
+        }
+      },
+      { upsert: true }
+    );
 
     // Send OTP via email
     const emailSent = await sendOTP(email, otp);
@@ -115,7 +135,7 @@ router.get('/email-health', async (req, res) => {
 // ✅ Verify OTP (Register + Login combined)
 router.post("/verify-otp", verifyOtpLimiter, async (req, res) => {
   try {
-    const { email, otp, firstName, lastName, isNewUser } = req.body;
+    const { email, otp } = req.body;
 
     // Validate inputs
     if (!email || !otp) {
@@ -133,21 +153,19 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res) => {
       });
     }
 
-    // Validate names if new user
-    if (isNewUser && (!firstName || !lastName)) {
-      return res.status(400).json({
-        success: false,
-        message: "First name and last name are required for registration",
-      });
-    }
+    // Get database connection
+    const db = await connectDB();
 
     // Check OTP
-    const otpQuery = `
-      SELECT * FROM email_verifications 
-      WHERE email = $1 AND otp = $2 AND expires_at > NOW() AND verified = false
-    `;
-    const otpResult = await pool.query(otpQuery, [email, otp]);
-    if (otpResult.rows.length === 0) {
+    const collection = db.collection('email_verifications');
+    const otpResult = await collection.findOne({ 
+      email: email, 
+      otp: otp, 
+      expires_at: { $gt: new Date() },
+      verified: false
+    });
+
+    if (!otpResult) {
       return res.status(400).json({
         success: false,
         message: "Invalid or expired OTP",
@@ -155,49 +173,61 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res) => {
     }
 
     // Mark OTP as used
-    await pool.query(
-      "UPDATE email_verifications SET verified = true WHERE email = $1",
-      [email]
+    await collection.updateOne(
+      { email: email },
+      { $set: { verified: true } }
     );
 
     let user;
+    const usersCollection = db.collection('users');
+    const profilesCollection = db.collection('user_profiles');
 
-    if (isNewUser) {
+    if (otpResult.is_new_user) {
+      // Validate names for new users
+      if (!otpResult.first_name || !otpResult.last_name) {
+        return res.status(400).json({
+          success: false,
+          message: "First name and last name are required for registration",
+        });
+      }
+
       // Check if user already exists (avoid duplicate email error)
-      const existingUser = await pool.query(
-        "SELECT id, email, first_name, last_name, campus_verified, profile_complete FROM users WHERE email = $1",
-        [email]
-      );
+      const existingUser = await usersCollection.findOne({ email: email });
 
-      if (existingUser.rows.length > 0) {
-        user = existingUser.rows[0];
+      if (existingUser) {
+        user = existingUser;
       } else {
         // Register new user
-        const userQuery = `
-          INSERT INTO users (email, first_name, last_name, campus_verified)
-          VALUES ($1, $2, $3, true)
-          RETURNING id, email, first_name, last_name, campus_verified, profile_complete
-        `;
-        const userResult = await pool.query(userQuery, [email, firstName, lastName]);
-        user = userResult.rows[0];
+        const newUser = {
+          email: email,
+          first_name: otpResult.first_name,
+          last_name: otpResult.last_name,
+          campus_verified: true,
+          profile_complete: false,
+          created_at: new Date(),
+          updated_at: new Date()
+        };
+
+        const userResult = await usersCollection.insertOne(newUser);
+        user = { ...newUser, id: userResult.insertedId };
 
         // Create empty profile
-        await pool.query("INSERT INTO user_profiles (user_id) VALUES ($1)", [user.id]);
+        await profilesCollection.insertOne({
+          user_id: userResult.insertedId,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
       }
     } else {
       // Login existing user
-      const userQuery = `
-        SELECT id, email, first_name, last_name, campus_verified, profile_complete
-        FROM users WHERE email = $1
-      `;
-      const userResult = await pool.query(userQuery, [email]);
-      if (userResult.rows.length === 0) {
+      const existingUser = await usersCollection.findOne({ email: email });
+      if (!existingUser) {
         return res.status(404).json({
           success: false,
           message: "User not found. Please register first.",
         });
       }
-      user = userResult.rows[0];
+      user = existingUser;
     }
 
     // Generate JWT
@@ -209,7 +239,7 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res) => {
 
     return res.json({
       success: true,
-      message: isNewUser ? "Account created successfully" : "Login successful",
+      message: otpResult.is_new_user ? "Account created successfully" : "Login successful",
       token,
       user: {
         id: user.id,
@@ -232,24 +262,26 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res) => {
 // ✅ Current user (requires Authorization: Bearer <token>)
 router.get("/me", authenticateToken, async (req, res) => {
   try {
+    // Get database connection
+    const db = await connectDB();
+    const collection = db.collection('users');
+    
     // Query names to ensure first/last name are present even if middleware doesn't include them
-    const result = await pool.query(
-      "SELECT id, email, first_name, last_name, campus_verified, profile_complete FROM users WHERE id = $1",
-      [req.user.id]
-    );
-    if (result.rows.length === 0) {
+    const user = await collection.findOne({ _id: req.user.id });
+    
+    if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    const row = result.rows[0];
+    
     return res.json({
       success: true,
       user: {
-        id: row.id,
-        email: row.email,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        campusVerified: row.campus_verified,
-        profileComplete: row.profile_complete,
+        id: user._id,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        campusVerified: user.campus_verified,
+        profileComplete: user.profile_complete,
       },
     });
   } catch (error) {
@@ -292,32 +324,40 @@ router.post("/google", async (req, res) => {
       });
     }
 
-    // Check if user exists
-    let user;
-    const existingUser = await pool.query(
-      "SELECT id, email, first_name, last_name, campus_verified, profile_complete FROM users WHERE email = $1",
-      [email]
-    );
+    // Get database connection
+    const db = await connectDB();
+    const usersCollection = db.collection('users');
+    const profilesCollection = db.collection('user_profiles');
 
-    if (existingUser.rows.length > 0) {
-      user = existingUser.rows[0];
-    } else {
+    // Check if user exists
+    let user = await usersCollection.findOne({ email: email });
+
+    if (!user) {
       // Create new user from Google account
-      const userQuery = `
-        INSERT INTO users (email, first_name, last_name, campus_verified)
-        VALUES ($1, $2, $3, true)
-        RETURNING id, email, first_name, last_name, campus_verified, profile_complete
-      `;
-      const userResult = await pool.query(userQuery, [email, given_name, family_name]);
-      user = userResult.rows[0];
+      const newUser = {
+        email: email,
+        first_name: given_name,
+        last_name: family_name,
+        campus_verified: true,
+        profile_complete: false,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+
+      const userResult = await usersCollection.insertOne(newUser);
+      user = { ...newUser, id: userResult.insertedId };
 
       // Create empty profile
-      await pool.query("INSERT INTO user_profiles (user_id) VALUES ($1)", [user.id]);
+      await profilesCollection.insertOne({
+        user_id: userResult.insertedId,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
     }
 
     // Generate JWT
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user._id || user.id, email: user.email },
       process.env.JWT_SECRET || "your-secret-key",
       { expiresIn: "7d" }
     );
@@ -327,7 +367,7 @@ router.post("/google", async (req, res) => {
       message: "Google login successful",
       token,
       user: {
-        id: user.id,
+        id: user._id || user.id,
         email: user.email,
         firstName: user.first_name,
         lastName: user.last_name,
@@ -340,64 +380,6 @@ router.post("/google", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Google authentication failed",
-    });
-  }
-});
-
-// ✅ Traditional email/password login
-router.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and password are required",
-      });
-    }
-
-    // For testing purposes, accept any password for existing users
-    // In production, you'd hash and verify passwords
-    const userQuery = `
-      SELECT id, email, first_name, last_name, campus_verified, profile_complete
-      FROM users WHERE email = $1
-    `;
-    const userResult = await pool.query(userQuery, [email]);
-
-    if (userResult.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid credentials",
-      });
-    }
-
-    const user = userResult.rows[0];
-
-    // Generate JWT
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "7d" }
-    );
-
-    return res.json({
-      success: true,
-      message: "Login successful",
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        campusVerified: user.campus_verified,
-        profileComplete: user.profile_complete,
-      },
-    });
-  } catch (error) {
-    console.error("Login error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
     });
   }
 });
