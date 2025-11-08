@@ -1,0 +1,46 @@
+{
+  "version": 2,
+  "public": false,
+  "builds": [
+    {
+      "src": "backend/server-vercel.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "backend/**"
+        ]
+      }
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/backend/server-vercel.js"
+    },
+    {
+      "src": "/socket.io/(.*)",
+      "dest": "/backend/server-vercel.js"
+    },
+    {
+      "src": "/peerjs/(.*)",
+      "dest": "/backend/server-vercel.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/dist/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "github": {
+    "silent": true
+  }
+}

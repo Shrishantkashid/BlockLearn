@@ -62,8 +62,14 @@ function LiveSession() {
   }, [code]);
 
   const initializeSocket = () => {
+    // Determine the backend URL based on environment
+    const backendUrl = import.meta.env.VITE_API_URL || 
+                      (window.location.hostname.includes('vercel.app') 
+                        ? `https://${window.location.hostname}` 
+                        : 'http://localhost:5000');
+    
     // Connect to the signaling server with proper configuration
-    socketRef.current = io('http://localhost:5000', {
+    socketRef.current = io(backendUrl, {
       transports: ['websocket'],
       withCredentials: true,
       reconnection: true,
@@ -72,11 +78,9 @@ function LiveSession() {
       path: '/socket.io',
       upgrade: false,
       rememberUpgrade: false,
-      // Add additional configuration to handle frame header issues
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       randomizationFactor: 0.5,
-      // Ensure no compression conflicts
     });
 
     socketRef.current.on('connect', () => {

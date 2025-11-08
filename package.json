@@ -1,17 +1,26 @@
 {
-  "name": "mini-project",
+  "name": "blocklearn",
   "version": "1.0.0",
-  "description": "",
+  "description": "A decentralized peer-to-peer skill exchange platform combining web3 and real-time communication",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "concurrently \"npm:server\" \"npm:client\"",
     "server": "npm --prefix backend run dev",
-    "client": "npm --prefix frontend run dev"
+    "client": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend run start"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "blockchain",
+    "education",
+    "skill-sharing",
+    "web3",
+    "webrtc",
+    "decentralized"
+  ],
+  "author": "BlockLearn Team",
+  "license": "MIT",
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

@@ -12,10 +12,27 @@ const initializeSocket = (server) => {
   
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || ['http://localhost:5173', 'http://localhost:5174'],
+      origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        // List of allowed origins
+        const allowedOrigins = [
+          'http://localhost:5173',
+          'http://localhost:5174',
+          'https://blocklearn.vercel.app', // Replace with your actual Vercel URL
+          process.env.FRONTEND_URL, // Environment variable for custom domain
+        ].filter(Boolean); // Remove any falsy values
+        
+        // Check if the origin is in our allowed list or is a Vercel preview URL
+        if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      },
       methods: ['GET', 'POST'],
       credentials: true,
-      // Add additional CORS options
       optionsSuccessStatus: 200
     },
     path: '/socket.io',
@@ -23,17 +40,12 @@ const initializeSocket = (server) => {
     upgrade: false,
     rememberUpgrade: false,
     allowEIO3: true,
-    // Add additional configuration to handle frame header issues
     serveClient: false,
     cookie: false,
-    // Ensure no compression conflicts
     perMessageDeflate: false,
     httpCompression: false,
-    // Add additional compression settings to ensure no compression
     compression: false,
-    // Add connection timeouts
     connectTimeout: 10000,
-    // Add ping settings
     pingInterval: 25000,
     pingTimeout: 5000
   });
@@ -55,6 +67,16 @@ const initializeSocket = (server) => {
         console.log('Offer sent to target:', data.target);
       } else {
         console.log('Target socket not found:', data.target);
+        // Try to send to all users in the same room except sender
+        socket.rooms.forEach(roomId => {
+          if (roomId !== socket.id) {
+            socket.to(roomId).emit('offer', {
+              offer: data.offer,
+              sender: socket.id
+            });
+            console.log('Offer broadcast to room:', roomId);
+          }
+        });
       }
     });
 
@@ -72,6 +94,16 @@ const initializeSocket = (server) => {
         console.log('Answer sent to target:', data.target);
       } else {
         console.log('Target socket not found:', data.target);
+        // Try to send to all users in the same room except sender
+        socket.rooms.forEach(roomId => {
+          if (roomId !== socket.id) {
+            socket.to(roomId).emit('answer', {
+              answer: data.answer,
+              sender: socket.id
+            });
+            console.log('Answer broadcast to room:', roomId);
+          }
+        });
       }
     });
 
@@ -89,6 +121,16 @@ const initializeSocket = (server) => {
         console.log('ICE candidate sent to target:', data.target);
       } else {
         console.log('Target socket not found:', data.target);
+        // Try to send to all users in the same room except sender
+        socket.rooms.forEach(roomId => {
+          if (roomId !== socket.id) {
+            socket.to(roomId).emit('ice-candidate', {
+              candidate: data.candidate,
+              sender: socket.id
+            });
+            console.log('ICE candidate broadcast to room:', roomId);
+          }
+        });
       }
     });
 
