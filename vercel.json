@@ -11,18 +11,16 @@
     },
     {
       "src": "frontend/package.json",
-      "use": "@vercel/static-build"
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "frontend/dist"
+      }
     }
   ],
-  "outputDirectory": "frontend/dist",
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/[[...all]].js"
-    },
-    {
-      "src": "/test.html",
-      "dest": "/public/test.html"
     },
     {
       "src": "/(.*)",

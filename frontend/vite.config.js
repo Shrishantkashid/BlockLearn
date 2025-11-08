@@ -20,7 +20,7 @@ export default defineConfig({
   },
   // Add build configuration for Vercel
   build: {
-    outDir: 'dist', // Build to the frontend's own dist folder
+    outDir: 'dist',
     assetsDir: 'assets',
     rollupOptions: {
       output: {
