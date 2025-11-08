@@ -1,5 +1,4 @@
 const express = require('express');
-const cors = require('cors');
 
 // Import routes
 const authRoutes = require('../backend/routes/auth');
@@ -15,7 +14,6 @@ const skillsRoutes = require('../backend/routes/skills');
 const app = express();
 
 // Middleware
-app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
