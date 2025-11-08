@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test (No Auth)</title>
+</head>
+<body>
+    <h1>WebSocket Connection Test (No Auth)</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+        // Try to connect to the Socket.IO server without authentication
+        const socket = io('http://localhost:5000', {
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            timeout: 10000,
+            path: '/socket.io',
+            upgrade: false,
+            rememberUpgrade: false,
+            // Remove authentication headers
+            withCredentials: false,
+            extraHeaders: {}
+        });
+
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+
+        socket.on('connect', () => {
+            console.log('Connected to signaling server with ID:', socket.id);
+            statusDiv.innerHTML = `✅ Connected with ID: ${socket.id}`;
+            addMessage(`✅ Connected with ID: ${socket.id}`);
+            
+            // Try to join a room
+            socket.emit('join-room', 'test-room');
+            addMessage(`📤 Joined test room`);
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+            statusDiv.innerHTML = `❌ Connection Error: ${error.message}`;
+            addMessage(`❌ Connection Error: ${error.message}`);
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.log('Disconnected from server. Reason:', reason);
+            statusDiv.innerHTML = `🔌 Disconnected: ${reason}`;
+            addMessage(`🔌 Disconnected: ${reason}`);
+        });
+
+        socket.on('user-joined', (userId) => {
+            console.log('User joined:', userId);
+            addMessage(`👥 User joined: ${userId}`);
+        });
+
+        function addMessage(message) {
+            const messageElement = document.createElement('div');
+            messageElement.textContent = message;
+            messagesDiv.appendChild(messageElement);
+        }
+    </script>
+</body>
+</html>

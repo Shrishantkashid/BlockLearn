@@ -1,18 +1,23 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
-import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { Sparkles, ArrowLeft, Mail, User, CheckCircle, AlertCircle, Shield } from "lucide-react";
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  Mail, 
+  MessageSquare, 
+  Sparkles,
+  User,
+  Users
+} from 'lucide-react';
+import api from '../api';
 
-function Signup() {
-  const [email, setEmail] = useState("");
+const Signup = () => {
+  const [step, setStep] = useState("form"); // "form" or "otp"
+  const [userType, setUserType] = useState("learner"); // "learner" or "mentor"
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [message, setMessage] = useState("");
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const navigate = useNavigate();
@@ -27,96 +32,74 @@ function Signup() {
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
-    if (!firstName || !lastName || !email) {
-      setMessage("Please fill in all fields");
-      return;
-    }
-
     setIsLoading(true);
     setMessage("");
 
+    // Basic validation
+    if (!firstName || !lastName || !email) {
+      setMessage("Please fill in all required fields.");
+      setIsLoading(false);
+      return;
+    }
+
+    if (!email.includes("@")) {
+      setMessage("Please enter a valid email address.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.post("/api/auth/send-otp", {
-        email,
-        firstName,
-        lastName,
+      const response = await api.post("/api/auth/send-otp", {
+        email: email,
+        firstName: firstName,
+        lastName: lastName,
+        userType: userType,
         isNewUser: true
       });
 
       if (response.data.success) {
-        setIsOtpSent(true);
-        setMessage("OTP sent to your email. Please check your inbox.");
+        setMessage("✅ OTP sent to your campus email!");
+        setStep("otp");
       } else {
         setMessage(response.data.message || "Failed to send OTP. Please try again.");
       }
     } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to send OTP. Please try again.");
+      setMessage("Failed to send OTP. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e) => {
+  const handleVerifyOTP = async (e) => {
     e.preventDefault();
-    if (!otp) {
-      setMessage("Please enter the OTP");
-      return;
-    }
-
-    setIsVerifying(true);
+    setIsLoading(true);
     setMessage("");
 
     try {
-      const response = await axios.post("/api/auth/verify-otp", {
-        email,
-        otp,
-        firstName,
-        lastName,
+      const response = await api.post("/api/auth/verify-otp", {
+        email: email,
+        otp: otp,
+        firstName: firstName,
+        lastName: lastName,
+        userType: userType,
         isNewUser: true
       });
 
       if (response.data.success) {
-        // Store token in localStorage
-        localStorage.setItem("token", response.data.token);
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('userData', JSON.stringify(response.data.user));
         
-        // Check if profile is complete
-        const user = response.data.user;
-        if (!user.profileComplete) {
-          setMessage("✅ Account created successfully! Redirecting to profile setup...");
-          setTimeout(() => navigate("/profile"), 1500);
+        // Redirect based on user type
+        if (userType === "mentor") {
+          navigate("/mentor/onboarding");
         } else {
-          setMessage("✅ Account created successfully!");
-          setTimeout(() => navigate("/dashboard"), 1500);
+          navigate("/profile");
         }
       } else {
         setMessage(response.data.message || "Invalid OTP. Please try again.");
       }
     } catch (error) {
-      setMessage(error.response?.data?.message || "OTP verification failed. Please try again.");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleResendOtp = async () => {
-    setIsLoading(true);
-    setMessage("");
-
-    try {
-      const response = await axios.post("/api/auth/send-otp", {
-        email,
-        firstName,
-        lastName,
-        isNewUser: true
-      });
-
-      if (response.data.success) {
-        setMessage("OTP resent successfully. Please check your email.");
-      } else {
-        setMessage(response.data.message || "Failed to resend OTP. Please try again.");
-      }
-    } catch (error) {
-      setMessage(error.response?.data?.message || "Failed to resend OTP. Please try again.");
+      setMessage("OTP verification failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -138,13 +121,15 @@ function Signup() {
           {/* Header */}
           <div className="text-center">
             <Link to="/" className="inline-flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity">
-              <Sparkles className="w-10 h-10 text-primary" />
+              <Sparkles className="w-10 h-10 text-[#2b57af]" />
               <span className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 BlockLearn
               </span>
             </Link>
-            <h2 className="text-3xl font-bold text-foreground mb-2">Create Your Account</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-3xl font-bold text-[#2b57af] mb-2">
+              Create Your Account
+            </h2>
+            <p className="text-[#2b57af]">
               Join the BlockLearn community today
             </p>
           </div>
@@ -168,12 +153,51 @@ function Signup() {
             />
 
             <div className="relative z-10">
-              {!isOtpSent ? (
+              {step === "form" ? (
                 <form onSubmit={handleSendOtp} className="space-y-6">
+                  {/* User Type Selection */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-[#2b57af] mb-3">
+                      I want to join as:
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setUserType("learner")}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          userType === "learner"
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <Users className="w-8 h-8 mx-auto mb-2 text-[#2b57af]" />
+                        <span className="font-medium text-[#2b57af]">Learner</span>
+                        <p className="text-xs text-[#2b57af] mt-1">
+                          Learn new skills from mentors
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUserType("mentor")}
+                        className={`p-4 rounded-xl border-2 transition-all ${
+                          userType === "mentor"
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <Users className="w-8 h-8 mx-auto mb-2 text-[#2b57af]" />
+                        <span className="font-medium text-[#2b57af]">Mentor</span>
+                        <p className="text-xs text-[#2b57af] mt-1">
+                          Share your knowledge with others
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label htmlFor="firstName" className="block text-sm font-medium text-foreground mb-2">
-                        <User className="w-4 h-4 inline mr-1" />
+                      <label htmlFor="firstName" className="block text-sm font-medium text-[#2b57af] mb-2">
+                        <User className="w-4 h-4 inline mr-1 text-[#2b57af]" />
                         First Name
                       </label>
                       <input
@@ -182,13 +206,13 @@ function Signup() {
                         placeholder="John"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
-                        className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
+                        className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-[#2b57af] placeholder-[#2b57af] focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
                         required
                       />
                     </div>
                     <div>
-                      <label htmlFor="lastName" className="block text-sm font-medium text-foreground mb-2">
-                        <User className="w-4 h-4 inline mr-1" />
+                      <label htmlFor="lastName" className="block text-sm font-medium text-[#2b57af] mb-2">
+                        <User className="w-4 h-4 inline mr-1 text-[#2b57af]" />
                         Last Name
                       </label>
                       <input
@@ -197,15 +221,15 @@ function Signup() {
                         placeholder="Doe"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
-                        className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
+                        className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-[#2b57af] placeholder-[#2b57af] focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
                         required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-                      <Mail className="w-4 h-4 inline mr-1" />
+                    <label htmlFor="email" className="block text-sm font-medium text-[#2b57af] mb-2">
+                      <Mail className="w-4 h-4 inline mr-1 text-[#2b57af]" />
                       Email Address
                     </label>
                     <input
@@ -214,7 +238,7 @@ function Signup() {
                       placeholder="your.email@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
+                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-[#2b57af] placeholder-[#2b57af] focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
                       required
                     />
                   </div>
@@ -238,112 +262,70 @@ function Signup() {
                   </button>
                 </form>
               ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-6">
-                  <div className="text-center mb-6">
-                    <Shield className="w-12 h-12 text-primary mx-auto mb-3" />
-                    <h3 className="text-xl font-bold text-foreground">Verify Your Email</h3>
-                    <p className="text-muted-foreground mt-2">
-                      We've sent a 6-digit code to <span className="font-medium">{email}</span>
-                    </p>
-                  </div>
-
+                <form onSubmit={handleVerifyOTP} className="space-y-6">
                   <div>
-                    <label htmlFor="otp" className="block text-sm font-medium text-foreground mb-2">
-                      <Shield className="w-4 h-4 inline mr-1" />
+                    <label htmlFor="otp" className="block text-sm font-medium text-[#2b57af] mb-2">
+                      <MessageSquare className="w-4 h-4 inline mr-1 text-[#2b57af]" />
                       Enter OTP
                     </label>
                     <input
                       id="otp"
                       type="text"
-                      placeholder="123456"
+                      placeholder="Enter 6-digit OTP"
                       value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm text-center text-2xl tracking-widest"
-                      maxLength={6}
+                      onChange={(e) => setOtp(e.target.value)}
+                      className="w-full px-4 py-3 bg-card/50 border border-border rounded-xl text-[#2b57af] placeholder-[#2b57af] focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent backdrop-blur-sm"
                       required
                     />
+                    <p className="text-xs text-[#2b57af] mt-1">
+                      OTP sent to: {email}
+                    </p>
                   </div>
 
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={isVerifying || otp.length !== 6}
-                      className="flex-1 px-4 py-3 rounded-xl bg-primary text-primary-foreground border border-primary/20 shadow-lg hover:bg-primary/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                    >
-                      {isVerifying ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Verifying...
-                        </>
-                      ) : (
-                        "Verify OTP"
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleResendOtp}
-                      disabled={isLoading}
-                      className="px-4 py-3 rounded-xl bg-secondary text-secondary-foreground border border-border shadow hover:bg-secondary/80 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Resend
-                    </button>
-                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full px-8 py-4 rounded-xl bg-primary text-primary-foreground border border-primary/20 shadow-lg hover:bg-primary/90 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isLoading ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Verifying...
+                      </>
+                    ) : (
+                      "Verify OTP"
+                    )}
+                  </button>
                 </form>
               )}
 
-              {/* Message Display */}
               {message && (
-                <div className={`mt-4 p-4 rounded-xl backdrop-blur-sm ${
-                  message.includes("✅")
-                    ? "bg-primary/20 text-foreground border border-primary/30"
-                    : "bg-destructive/20 text-foreground border border-destructive/30"
+                <div className={`mt-4 p-3 rounded-lg text-sm ${
+                  message.includes("✅") 
+                    ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800" 
+                    : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
                 }`}>
-                  <div className="flex items-center">
-                    {message.includes("✅") ? (
-                      <CheckCircle className="w-5 h-5 mr-2" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 mr-2" />
-                    )}
-                    <span className="text-sm font-medium">{message}</span>
-                  </div>
+                  {message}
                 </div>
               )}
 
-              {/* Back to form link when OTP is sent */}
-              {isOtpSent && (
-                <div className="mt-4 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setIsOtpSent(false)}
-                    className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
-                  >
-                    Change email address
-                  </button>
-                </div>
-              )}
+              <div className="mt-6 text-center">
+                <p className="text-sm text-[#2b57af]">
+                  Already have an account?{' '}
+                  <Link to="/login" className="font-medium text-primary hover:text-primary/80 transition-colors">
+                    Sign in
+                  </Link>
+                </p>
+              </div>
             </div>
-          </div>
-
-          {/* Footer Links */}
-          <div className="text-center space-y-4">
-            <p className="text-muted-foreground">
-              Already have an account?{" "}
-              <Link to="/login" className="text-primary hover:text-primary/80 font-medium transition-colors">
-                Sign in here
-              </Link>
-            </p>
-            <Link to="/" className="text-muted-foreground hover:text-foreground text-sm flex items-center justify-center gap-2 transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              Back to home
-            </Link>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default Signup;

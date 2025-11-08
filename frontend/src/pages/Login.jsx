@@ -1,43 +1,75 @@
-import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  Mail, 
+  MessageSquare, 
+  Sparkles,
+  ArrowRight,
+  User
+} from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
-import { Sparkles, ArrowLeft, Mail, MessageSquare } from "lucide-react";
+import api from '../api';
 
-function Login() {
+const Login = () => {
+  const [step, setStep] = useState("email"); // "email" or "otp"
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState("email"); // "email" or "otp"
+  const [message, setMessage] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('userData');
+    
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        // Redirect based on user type
+        if (parsedUser.userType === 'mentor') {
+          // For mentors, always go to mentor dashboard where they can see their approval status
+          navigate("/mentor/dashboard");
+        } else {
+          // Check if profile is complete
+          if (!parsedUser.profileComplete) {
+            navigate("/profile");
+          } else {
+            navigate("/dashboard");
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
+  }, [navigate]);
 
   const handleSendOTP = async (e) => {
     e.preventDefault();
-    if (!email) {
-      setMessage("Please enter your email address");
-      return;
-    }
-
     setIsLoading(true);
     setMessage("");
 
+    // Basic email validation
+    if (!email || !email.includes("@")) {
+      setMessage("Please enter a valid email address.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch('/api/auth/send-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
+      const response = await api.post("/api/auth/send-otp", {
+        email: email,
+        isNewUser: false  // This is for login, not registration
       });
 
-      if (response.ok) {
-        setMessage("✅ OTP sent to your email!");
+      if (response.data.success) {
+        setMessage("✅ OTP sent to your campus email!");
         setStep("otp");
       } else {
-        setMessage("Failed to send OTP. Please try again.");
+        setMessage(response.data.message || "Failed to send OTP. Please try again.");
       }
     } catch (error) {
-      setMessage("Failed to send OTP. Please check your connection and try again.");
+      setMessage("Failed to send OTP. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -45,43 +77,37 @@ function Login() {
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
-    if (!email || !otp) {
-      setMessage("Please fill in all fields");
-      return;
-    }
-
     setIsLoading(true);
     setMessage("");
 
     try {
-      const response = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          otp,
-          isNewUser: false  // This is for login, not registration
-        }),
+      const response = await api.post("/api/auth/verify-otp", {
+        email: email,
+        otp: otp,
+        isNewUser: false  // This is for login, not registration
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userData', JSON.stringify(data.user));
+      if (response.data.success) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('userData', JSON.stringify(response.data.user));
         
-        // Check if profile is complete
-        if (!data.user.profileComplete) {
-          setMessage("✅ Login successful! Redirecting to profile setup...");
-          setTimeout(() => navigate("/profile"), 1500);
+        // Redirect based on user type
+        if (response.data.user.userType === 'mentor') {
+          // For mentors, always go to mentor dashboard where they can see their approval status
+          setMessage("✅ Login successful! Redirecting to mentor dashboard...");
+          setTimeout(() => navigate("/mentor/dashboard"), 1500);
         } else {
-          setMessage("✅ Login successful!");
-          setTimeout(() => navigate("/dashboard"), 1500);
+          // Check if profile is complete
+          if (!response.data.user.profileComplete) {
+            setMessage("✅ Login successful! Redirecting to profile setup...");
+            setTimeout(() => navigate("/profile"), 1500);
+          } else {
+            setMessage("✅ Login successful!");
+            setTimeout(() => navigate("/dashboard"), 1500);
+          }
         }
       } else {
-        const errorData = await response.json();
-        setMessage(errorData.message || "Invalid OTP. Please try again.");
+        setMessage(response.data.message || "Invalid OTP. Please try again.");
       }
     } catch (error) {
       setMessage("OTP verification failed. Please try again.");
@@ -107,13 +133,20 @@ function Login() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('userData', JSON.stringify(data.user));
         
-        // Check if profile is complete
-        if (!data.user.profileComplete) {
-          setMessage("✅ Login successful! Redirecting to profile setup...");
-          setTimeout(() => navigate("/profile"), 1500);
+        // Redirect based on user type
+        if (data.user.userType === 'mentor') {
+          // For mentors, always go to mentor dashboard where they can see their approval status
+          setMessage("✅ Login successful! Redirecting to mentor dashboard...");
+          setTimeout(() => navigate("/mentor/dashboard"), 1500);
         } else {
-          setMessage("✅ Login successful!");
-          setTimeout(() => navigate("/dashboard"), 1500);
+          // Check if profile is complete
+          if (!data.user.profileComplete) {
+            setMessage("✅ Login successful! Redirecting to profile setup...");
+            setTimeout(() => navigate("/profile"), 1500);
+          } else {
+            setMessage("✅ Login successful!");
+            setTimeout(() => navigate("/dashboard"), 1500);
+          }
         }
       } else {
         setMessage("Google login failed. Please try again.");
@@ -144,7 +177,7 @@ function Login() {
         <div className="max-w-md w-full space-y-8">
           {/* Header */}
           <div className="text-center">
-            <Link to="/" className="inline-flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity">
+            <Link to="/prelogin" className="inline-flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity">
               <Sparkles className="w-10 h-10 text-primary" />
               <span className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 BlockLearn
@@ -232,68 +265,53 @@ function Login() {
                     "Verify OTP"
                   )}
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStep("email")}
-                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  ← Back to email
-                </button>
               </form>
             )}
 
-            {/* Divider */}
-            <div className="flex items-center gap-4 my-6">
-              <div className="flex-1 h-px bg-border"></div>
-              <span className="text-xs text-muted-foreground">or continue with</span>
-              <div className="flex-1 h-px bg-border"></div>
-            </div>
-
-            {/* Google Sign In */}
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={handleGoogleError}
-              useOneTap={false}
-              theme="outline"
-              size="large"
-              text="signin_with"
-              shape="rectangular"
-              width="100%"
-              className="w-full"
-            />
-
-            {/* Message Display */}
             {message && (
-              <div className={`mt-4 p-4 rounded-xl backdrop-blur-sm ${
-                message.includes("✅")
-                  ? "bg-primary/20 text-foreground border border-primary/30"
-                  : "bg-destructive/20 text-foreground border border-destructive/30"
+              <div className={`mt-4 p-3 rounded-lg text-sm ${
+                message.includes("✅") 
+                  ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800" 
+                  : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800"
               }`}>
-                <div className="flex items-center">
-                  <span className="text-sm font-medium">{message}</span>
-                </div>
+                {message}
               </div>
             )}
-          </div>
 
-          {/* Footer Links */}
-          <div className="text-center space-y-4">
-            <p className="text-muted-foreground">
-              Don't have an account?{" "}
-              <Link to="/signup" className="text-primary hover:text-primary/80 font-medium transition-colors">
-                Sign up here
-              </Link>
-            </p>
-            <Link to="/" className="text-muted-foreground hover:text-foreground text-sm flex items-center justify-center gap-2 transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              Back to home
-            </Link>
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border/30"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-card/50 dark:bg-slate-900/50 text-muted-foreground">
+                    Or continue with
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={handleGoogleError}
+                  useOneTap
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Don't have an account?{' '}
+                <Link to="/signup" className="font-medium text-primary hover:text-primary/80 transition-colors">
+                  Sign up
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default Login;

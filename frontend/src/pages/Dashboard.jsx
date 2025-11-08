@@ -1,70 +1,49 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
-import { Wallet, Award, BookOpen, Users, Settings, LogOut } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  User, 
+  Settings, 
+  LogOut, 
+  BookOpen, 
+  Users, 
+  Award, 
+  Wallet,
+  ArrowLeft
+} from 'lucide-react';
 
-function Dashboard() {
+const Dashboard = () => {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("userData");
-    navigate("/");
+    localStorage.removeItem('token');
+    localStorage.removeItem('userData');
+    navigate('/login');
+  };
+
+  const handleViewProfile = () => {
+    navigate('/profile/view');
   };
 
   useEffect(() => {
-    // Check if we have a token and try to get real user data
-    if (token) {
-      (async () => {
-        try {
-          const res = await axios.get("/api/auth/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          
-          // Check if profile is complete
-          if (!res.data.user.profileComplete) {
-            navigate("/profile");
-            return;
-          }
-          
-          setUser(res.data.user);
-        } catch (error) {
-          console.log("Backend not available, using local storage data");
-          // If backend is not available, try to get user data from localStorage
-          const savedUser = localStorage.getItem("userData");
-          if (savedUser) {
-            const userData = JSON.parse(savedUser);
-            // Check if profile is complete
-            if (!userData.profileComplete) {
-              navigate("/profile");
-              return;
-            }
-            setUser(userData);
-          } else {
-            // No saved data, redirect to login
-            handleLogout();
-          }
-        }
-      })();
-    } else {
-      // No token, check if we have saved user data
-      const savedUser = localStorage.getItem("userData");
-      if (savedUser) {
-        const userData = JSON.parse(savedUser);
-        // Check if profile is complete
-        if (!userData.profileComplete) {
-          navigate("/profile");
-          return;
-        }
-        setUser(userData);
-      } else {
-        // No saved data, redirect to login
-        navigate("/login");
+    console.log("Dashboard useEffect triggered");
+    // Check if we have user data and try to get real user data
+    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+    const token = localStorage.getItem("token");
+    
+    if (userData && (userData.id || userData._id)) {
+      // Check if profile is complete
+      if (!userData.profileComplete) {
+        navigate("/profile");
+        return;
       }
+      
+      setUser(userData);
+    } else {
+      // No saved data, redirect to login
+      navigate("/login");
     }
-  }, [token, navigate]);
+  }, [navigate]);
 
   if (!user) {
     return (
@@ -94,6 +73,12 @@ function Dashboard() {
 
             <div className="flex items-center gap-4">
               <span className="text-gray-600 dark:text-slate-300 text-sm truncate max-w-32">{displayName}</span>
+              <button 
+                onClick={handleViewProfile}
+                className="text-gray-600 dark:text-slate-300 hover:text-primary transition-colors"
+              >
+                <User className="w-5 h-5" />
+              </button>
               <Link to="/settings" className="text-gray-600 dark:text-slate-300 hover:text-primary transition-colors">
                 <Settings className="w-5 h-5" />
               </Link>
@@ -122,6 +107,15 @@ function Dashboard() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <button 
+            onClick={handleViewProfile}
+            className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow text-left"
+          >
+            <User className="w-8 h-8 text-primary mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">View Profile</h3>
+            <p className="text-gray-600 dark:text-slate-400">See your profile details and information</p>
+          </button>
+
           <Link to="/match" className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow">
             <Users className="w-8 h-8 text-primary mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">Find a Mentor</h3>
@@ -132,12 +126,6 @@ function Dashboard() {
             <BookOpen className="w-8 h-8 text-primary mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">Book a Session</h3>
             <p className="text-gray-600 dark:text-slate-400">Schedule personalized learning sessions</p>
-          </Link>
-
-          <Link to="/blockchain-certificates" className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow">
-            <Award className="w-8 h-8 text-primary mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">View Certificates</h3>
-            <p className="text-gray-600 dark:text-slate-400">See your blockchain-verified achievements</p>
           </Link>
         </div>
 
@@ -249,22 +237,19 @@ function Dashboard() {
 
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-slate-100">Python</span>
-                  <span className="text-sm text-gray-600 dark:text-slate-400">45%</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-slate-100">Node.js</span>
+                  <span className="text-sm text-gray-600 dark:text-slate-400">40%</span>
                 </div>
                 <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: '45%' }}></div>
+                  <div className="bg-primary h-2 rounded-full" style={{ width: '40%' }}></div>
                 </div>
               </div>
             </div>
-            <Link to="/skills" className="mt-4 inline-block text-primary hover:text-primary/80 font-medium">
-              Manage skills →
-            </Link>
           </div>
         </div>
       </main>
     </div>
   );
-}
+};
 
 export default Dashboard;

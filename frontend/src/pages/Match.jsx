@@ -1,7 +1,42 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { getAllSkills, getMatchingMentors } from '../api';
+import MatchingSystem from '../components/MatchingSystem';
 
 function Match() {
+  const [skills, setSkills] = useState([]);
+  const [selectedSkill, setSelectedSkill] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetchSkills();
+  }, []);
+
+  const fetchSkills = async () => {
+    try {
+      const response = await getAllSkills();
+      if (response.success) {
+        setSkills(response.data);
+      }
+    } catch (err) {
+      console.error('Error fetching skills:', err);
+      setError('Failed to load skills');
+    }
+  };
+
+  const handleSkillChange = (e) => {
+    setSelectedSkill(e.target.value);
+  };
+
+  const handleSearch = () => {
+    if (!selectedSkill) {
+      setError('Please select a skill');
+      return;
+    }
+    setError('');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       {/* Navigation */}
@@ -40,149 +75,59 @@ function Match() {
           </p>
         </div>
 
-        {/* Filter Section */}
+        {/* Search Section */}
         <div className="card mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">Filter Matches</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Skill Category</label>
-              <select className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                <option>All Skills</option>
-                <option>Programming</option>
-                <option>Design</option>
-                <option>Languages</option>
-                <option>Music</option>
-                <option>Photography</option>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">Find Mentors by Skill</h2>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Select a Skill</label>
+              <select 
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                value={selectedSkill}
+                onChange={handleSkillChange}
+              >
+                <option value="">Choose a skill...</option>
+                {skills.map((skill) => (
+                  <option key={skill._id} value={skill._id}>
+                    {skill.name}
+                  </option>
+                ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Match Type</label>
-              <select className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                <option>Both (Teach & Learn)</option>
-                <option>I can teach</option>
-                <option>I want to learn</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Availability</label>
-              <select className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent">
-                <option>Any time</option>
-                <option>Weekdays</option>
-                <option>Weekends</option>
-                <option>Evenings</option>
-              </select>
+            <div className="flex items-end">
+              <button 
+                className="btn-primary w-full sm:w-auto"
+                onClick={handleSearch}
+              >
+                Find Mentors
+              </button>
             </div>
           </div>
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg">
+              {error}
+            </div>
+          )}
         </div>
 
-        {/* Matches Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Match Card 1 */}
-          <div className="card hover:shadow-lg transition-shadow">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 text-lg font-bold">
-                A
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-slate-100">Alex Johnson</h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">Computer Science</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Can Teach:</h4>
-                <div className="flex flex-wrap gap-1">
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">JavaScript</span>
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">React</span>
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">Python</span>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Wants to Learn:</h4>
-                <div className="flex flex-wrap gap-1">
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Photography</span>
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Spanish</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-2 mt-4">
-              <button className="btn-primary flex-1">Connect</button>
-              <button className="btn-secondary">View Profile</button>
-            </div>
+        {/* Matching System */}
+        {selectedSkill && (
+          <div className="mt-8">
+            <MatchingSystem skillId={selectedSkill} />
           </div>
+        )}
 
-          {/* Match Card 2 */}
-          <div className="card hover:shadow-lg transition-shadow">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 text-lg font-bold">
-                S
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-slate-100">Sarah Chen</h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">Graphic Design</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Can Teach:</h4>
-                <div className="flex flex-wrap gap-1">
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">UI/UX Design</span>
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">Figma</span>
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">Photoshop</span>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Wants to Learn:</h4>
-                <div className="flex flex-wrap gap-1">
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Web Development</span>
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">JavaScript</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-2 mt-4">
-              <button className="btn-primary flex-1">Connect</button>
-              <button className="btn-secondary">View Profile</button>
-            </div>
+        {/* Information Section */}
+        {!selectedSkill && (
+          <div className="text-center py-12">
+            <div className="text-5xl mb-4">🤝</div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-2">Find Your Perfect Learning Partner</h3>
+            <p className="text-gray-600 dark:text-slate-400 max-w-2xl mx-auto">
+              Select a skill above to discover mentors who can help you learn. Our smart matching algorithm 
+              connects you with the best peers based on skills, availability, and experience.
+            </p>
           </div>
-
-          {/* Match Card 3 */}
-          <div className="card hover:shadow-lg transition-shadow">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 text-lg font-bold">
-                M
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-slate-100">Mike Rodriguez</h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400">Music</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Can Teach:</h4>
-                <div className="flex flex-wrap gap-1">
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">Guitar</span>
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">Music Theory</span>
-                </div>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Wants to Learn:</h4>
-                <div className="flex flex-wrap gap-1">
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Programming</span>
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Data Science</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex space-x-2 mt-4">
-              <button className="btn-primary flex-1">Connect</button>
-              <button className="btn-secondary">View Profile</button>
-            </div>
-          </div>
-        </div>
-
-        {/* Load More */}
-        <div className="text-center mt-8">
-          <button className="btn-secondary">Load More Matches</button>
-        </div>
+        )}
       </main>
     </div>
   );

@@ -17,7 +17,7 @@ async function connectDB() {
       throw new Error('MongoDB URI not configured. Please update MONGODB_URI in .env file with your actual MongoDB Atlas connection string.');
     }
     
-    console.log('Connecting to MongoDB...');
+    console.log('Connecting to MongoDB with URI:', MONGODB_URI.replace(/:[^:@]+@/, ':***@')); // Hide password in logs
     client = new MongoClient(MONGODB_URI, {
       // Add connection options for better reliability
       serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of default 30s
@@ -26,7 +26,7 @@ async function connectDB() {
     
     await client.connect();
     db = client.db('blocklearn');
-    console.log('✅ MongoDB connected successfully');
+    console.log('✅ MongoDB connected successfully to database:', db.databaseName);
     return db;
   } catch (err) {
     console.error('❌ MongoDB connection error:', err.message);

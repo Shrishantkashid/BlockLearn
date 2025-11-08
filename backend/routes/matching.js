@@ -1,6 +1,7 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
 const { connectDB } = require("../config/database");
+const { ObjectId } = require('mongodb');
 const MatchingService = require("../utils/matchingService");
 
 const router = express.Router();
@@ -226,27 +227,29 @@ router.get("/mentors/:skillId", authenticateToken, async (req, res) => {
     const userSkillsCollection = db.collection('user_skills');
 
     // Get student profile
-    const studentUser = await usersCollection.findOne({ _id: studentId });
-    const studentProfile = await profilesCollection.findOne({ user_id: studentId });
-
-    if (!studentUser || !studentProfile) {
+    const studentUser = await usersCollection.findOne({ _id: new ObjectId(studentId) });
+    
+    if (!studentUser) {
       return res.status(404).json({
         success: false,
-        message: "Student profile not found"
+        message: "Student user not found"
       });
     }
+    
+    // Get student profile (may not exist for new users)
+    const studentProfile = await profilesCollection.findOne({ user_id: new ObjectId(studentId) });
 
     const student = {
       ...studentUser,
-      ...studentProfile,
+      ...(studentProfile || {}), // Merge profile data if it exists
       userId: studentId
     };
 
     // Get all mentors who offer this skill
     const mentorUserSkills = await userSkillsCollection.find({
-      skill_id: skillId,
+      skill_id: new ObjectId(skillId),
       skill_type: 'offered',
-      user_id: { $ne: studentId } // Don't match student with themselves
+      user_id: { $ne: new ObjectId(studentId) } // Don't match student with themselves
     }).toArray();
 
     if (mentorUserSkills.length === 0) {
@@ -258,24 +261,24 @@ router.get("/mentors/:skillId", authenticateToken, async (req, res) => {
     }
 
     // Get unique mentor IDs
-    const mentorIds = [...new Set(mentorUserSkills.map(skill => skill.user_id))];
+    const mentorIds = [...new Set(mentorUserSkills.map(skill => skill.user_id.toString()))];
 
     // Get mentor details
     const mentors = [];
     for (const mentorId of mentorIds) {
-      const mentorUser = await usersCollection.findOne({ _id: mentorId });
-      const mentorProfile = await profilesCollection.findOne({ user_id: mentorId });
+      const mentorUser = await usersCollection.findOne({ _id: new ObjectId(mentorId) });
+      const mentorProfile = await profilesCollection.findOne({ user_id: new ObjectId(mentorId) });
       
-      if (mentorUser && mentorProfile) {
+      if (mentorUser) {
         mentors.push({
           user_id: mentorId,
           first_name: mentorUser.first_name,
           last_name: mentorUser.last_name,
           email: mentorUser.email,
-          campus: mentorProfile.campus,
-          availability: mentorProfile.availability,
-          bio: mentorProfile.bio,
-          avatar_url: mentorProfile.avatar_url
+          campus: mentorProfile ? mentorProfile.campus : null,
+          availability: mentorProfile ? mentorProfile.availability : null,
+          bio: mentorProfile ? mentorProfile.bio : null,
+          avatar_url: mentorProfile ? mentorProfile.avatar_url : null
         });
       }
     }
@@ -325,7 +328,7 @@ router.get("/mentors/:skillId", authenticateToken, async (req, res) => {
     console.error("Error getting mentors:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Internal server error: " + error.message
     });
   }
 });
@@ -344,36 +347,40 @@ router.get("/match-detail/:mentorId/:skillId", authenticateToken, async (req, re
     const profilesCollection = db.collection('user_profiles');
 
     // Get student profile
-    const studentUser = await usersCollection.findOne({ _id: studentId });
-    const studentProfile = await profilesCollection.findOne({ user_id: studentId });
-
-    if (!studentUser || !studentProfile) {
+    const studentUser = await usersCollection.findOne({ _id: new ObjectId(studentId) });
+    
+    if (!studentUser) {
       return res.status(404).json({
         success: false,
-        message: "Student profile not found"
+        message: "Student user not found"
       });
     }
+    
+    // Get student profile (may not exist for new users)
+    const studentProfile = await profilesCollection.findOne({ user_id: new ObjectId(studentId) });
 
     const student = {
       ...studentUser,
-      ...studentProfile,
+      ...(studentProfile || {}), // Merge profile data if it exists
       userId: studentId
     };
 
     // Get mentor profile
-    const mentorUser = await usersCollection.findOne({ _id: mentorId });
-    const mentorProfile = await profilesCollection.findOne({ user_id: mentorId });
-
-    if (!mentorUser || !mentorProfile) {
+    const mentorUser = await usersCollection.findOne({ _id: new ObjectId(mentorId) });
+    
+    if (!mentorUser) {
       return res.status(404).json({
         success: false,
-        message: "Mentor profile not found"
+        message: "Mentor user not found"
       });
     }
+    
+    // Get mentor profile (may not exist for new users)
+    const mentorProfile = await profilesCollection.findOne({ user_id: new ObjectId(mentorId) });
 
     const mentor = {
       ...mentorUser,
-      ...mentorProfile,
+      ...(mentorProfile || {}), // Merge profile data if it exists
       userId: mentorId
     };
 
@@ -409,7 +416,7 @@ router.get("/match-detail/:mentorId/:skillId", authenticateToken, async (req, re
     console.error("Error getting match detail:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Internal server error: " + error.message
     });
   }
 });

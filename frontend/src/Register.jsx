@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { sendOTP, verifyOTP } from './api';
-import axios from "axios";
+import api from "../api"; // Use the api service instead of axios directly
 import { GoogleLogin } from '@react-oauth/google';
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { Sparkles, ArrowLeft, Mail, User, CheckCircle, AlertCircle, Shield } from "lucide-react";
@@ -115,7 +115,7 @@ const Register = () => {
     setIsLoading(true);
     setMessage("");
     try {
-      const res = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:5000/api'}/auth/google`, { 
+      const res = await api.post("/api/auth/google", { 
         credential: credentialResponse.credential,
         isNewUser: true
       });

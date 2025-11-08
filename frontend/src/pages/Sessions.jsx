@@ -1,85 +1,119 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import FeedbackModal from '../components/FeedbackModal';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  Calendar, 
+  Clock, 
+  Users, 
+  Award, 
+  MessageSquare,
+  ArrowLeft,
+  CheckCircle,
+  Video,
+  Copy,
+  Check
+} from 'lucide-react';
+import api from '../api';
+import LiveSessionModal from '../components/LiveSessionModal';
+import LiveSessionCode from '../components/LiveSessionCode';
 
-function Sessions() {
-  const [activeTab, setActiveTab] = useState('upcoming');
+const Sessions = () => {
   const [sessions, setSessions] = useState({
     upcoming: [],
     completed: []
   });
+  const [loading, setLoading] = useState(true);
   const [feedbackModal, setFeedbackModal] = useState({
     isOpen: false,
     sessionId: null,
     userRole: null,
     existingFeedback: null
   });
-  const [loading, setLoading] = useState(true);
+  const [liveSessionModal, setLiveSessionModal] = useState({
+    isOpen: false,
+    session: null
+  });
+  const [generatedLiveSession, setGeneratedLiveSession] = useState(null);
 
-  // Mock data for demonstration - replace with actual API calls
   useEffect(() => {
-    // Simulate loading sessions
-    setTimeout(() => {
-      setSessions({
-        upcoming: [
-          {
-            id: 1,
-            title: 'JavaScript Fundamentals',
-            mentor: 'Alex Johnson',
-            time: 'Tomorrow, 2:00 PM',
-            duration: '1 hour',
-            location: 'Online',
-            status: 'scheduled'
-          },
-          {
-            id: 2,
-            title: 'UI/UX Design Basics',
-            mentor: 'Sarah Chen',
-            time: 'Friday, 4:00 PM',
-            duration: '1.5 hours',
-            location: 'Library Room 201',
-            status: 'scheduled'
-          }
-        ],
-        completed: [
-          {
-            id: 3,
-            title: 'React Advanced Concepts',
-            mentor: 'Mike Rodriguez',
-            time: 'Yesterday, 3:00 PM',
-            duration: '2 hours',
-            location: 'Online',
-            status: 'completed',
-            hasFeedback: false
-          },
-          {
-            id: 4,
-            title: 'Node.js Backend Development',
-            mentor: 'Emma Wilson',
-            time: 'Last week, 1:00 PM',
-            duration: '1.5 hours',
-            location: 'Online',
-            status: 'completed',
-            hasFeedback: true
-          }
-        ]
-      });
-      setLoading(false);
-    }, 1000);
+    fetchUserSessions();
   }, []);
+
+  const fetchUserSessions = async () => {
+    try {
+      const response = await api.get('/api/sessions');
+      if (response.data.success) {
+        // Separate upcoming and completed sessions
+        const upcoming = response.data.data.filter(session => session.status === 'scheduled');
+        const completed = response.data.data.filter(session => session.status === 'completed');
+        
+        setSessions({
+          upcoming,
+          completed
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+      // Fallback to mock data if API fails
+      setTimeout(() => {
+        setSessions({
+          upcoming: [
+            {
+              id: 1,
+              title: 'JavaScript Fundamentals',
+              mentor: { first_name: 'Alex', last_name: 'Johnson' },
+              time: 'Tomorrow, 2:00 PM',
+              duration: '1 hour',
+              location: 'Online',
+              status: 'scheduled',
+              skill: { name: 'JavaScript' }
+            },
+            {
+              id: 2,
+              title: 'UI/UX Design Basics',
+              mentor: { first_name: 'Sarah', last_name: 'Chen' },
+              time: 'Friday, 4:00 PM',
+              duration: '1.5 hours',
+              location: 'Library Room 201',
+              status: 'scheduled',
+              skill: { name: 'UI/UX Design' }
+            }
+          ],
+          completed: [
+            {
+              id: 3,
+              title: 'React Advanced Concepts',
+              mentor: { first_name: 'Mike', last_name: 'Rodriguez' },
+              time: 'Yesterday, 3:00 PM',
+              duration: '2 hours',
+              location: 'Online',
+              status: 'completed',
+              hasFeedback: false,
+              skill: { name: 'React' }
+            },
+            {
+              id: 4,
+              title: 'Node.js Backend Development',
+              mentor: { first_name: 'Emma', last_name: 'Wilson' },
+              time: 'Last week, 1:00 PM',
+              duration: '1.5 hours',
+              location: 'Online',
+              status: 'completed',
+              hasFeedback: true,
+              skill: { name: 'Node.js' }
+            }
+          ]
+        });
+      }, 1000);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFeedbackSubmit = async (feedbackData) => {
     try {
-      const response = await fetch('/api/feedback/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(feedbackData)
-      });
-
-      if (response.ok) {
+      const response = await api.post('/api/feedback/submit', feedbackData);
+      
+      if (response.data.success) {
         // Update local state to show feedback was submitted
         setSessions(prev => ({
           ...prev,
@@ -101,19 +135,14 @@ function Sessions() {
   const openFeedbackModal = async (sessionId, userRole) => {
     try {
       // Fetch existing feedback for the session
-      const response = await fetch(`/api/feedback/session/${sessionId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
+      const response = await api.get(`/api/feedback/session/${sessionId}`);
+      
+      if (response.data.success) {
         setFeedbackModal({
           isOpen: true,
           sessionId,
           userRole,
-          existingFeedback: data.data
+          existingFeedback: response.data.data
         });
       } else {
         setFeedbackModal({
@@ -143,6 +172,30 @@ function Sessions() {
     });
   };
 
+  const openLiveSessionModal = (session) => {
+    setLiveSessionModal({
+      isOpen: true,
+      session
+    });
+  };
+
+  const closeLiveSessionModal = () => {
+    setLiveSessionModal({
+      isOpen: false,
+      session: null
+    });
+  };
+
+  const handleLiveSessionCodeGenerated = (liveSessionData) => {
+    setGeneratedLiveSession(liveSessionData);
+    closeLiveSessionModal();
+  };
+
+  const handleJoinLiveSession = (code) => {
+    // Navigate to the live session page
+    navigate(`/session/live/${code}`);
+  };
+
   const renderSessionCard = (session) => (
     <div key={session.id} className="card">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -152,32 +205,21 @@ function Sessions() {
               ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
               : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
           }`}>
-            {session.mentor.split(' ').map(n => n[0]).join('')}
+            {session.mentor.first_name?.charAt(0)}{session.mentor.last_name?.charAt(0)}
           </div>
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100">
-              {session.title}
+              {session.skill?.name || 'Session'}
             </h3>
-            <p className="text-gray-600 dark:text-slate-400">with {session.mentor}</p>
+            <p className="text-gray-600 dark:text-slate-400">with {session.mentor.first_name} {session.mentor.last_name}</p>
             <div className="flex items-center space-x-4 mt-2 text-sm text-gray-500 dark:text-slate-400">
               <span className="flex items-center">
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                {session.time}
+                <Calendar className="w-4 h-4 mr-1" />
+                {new Date(session.scheduled_at).toLocaleString()}
               </span>
               <span className="flex items-center">
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {session.duration}
-              </span>
-              <span className="flex items-center">
-                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                {session.location}
+                <Clock className="w-4 h-4 mr-1" />
+                {session.duration_minutes} minutes
               </span>
             </div>
           </div>
@@ -199,15 +241,30 @@ function Sessions() {
               )}
             </>
           ) : (
-            <>
-              <button className="btn-secondary">Reschedule</button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => openLiveSessionModal(session)}
+                className="flex items-center px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+              >
+                <Video className="w-4 h-4 mr-1" />
+                Start Live Session
+              </button>
               <button className="btn-primary">Join Session</button>
-            </>
+            </div>
           )}
         </div>
       </div>
     </div>
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
       {/* Navigation */}
@@ -229,100 +286,187 @@ function Sessions() {
               <Link to="/match" className="text-gray-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors">
                 Match
               </Link>
-              <Link to="/sessions" className="text-primary-600 dark:text-primary-400 font-medium">
-                Sessions
-              </Link>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-slate-100 mb-4">Learning Sessions</h1>
-          <p className="text-xl text-gray-600 dark:text-slate-400 max-w-2xl mx-auto">
-            Manage your scheduled learning sessions and track your progress
-          </p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center mb-8">
+          <Link to="/dashboard" className="flex items-center text-gray-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            <span>Back to Dashboard</span>
+          </Link>
         </div>
 
-        {/* Session Tabs */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-slate-700">
-            <button className="px-6 py-2 text-sm font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 rounded-md">
-              Upcoming
-            </button>
-            <button className="px-6 py-2 text-sm font-medium text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 transition-colors">
-              In Progress
-            </button>
-            <button className="px-6 py-2 text-sm font-medium text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300 transition-colors">
-              Completed
-            </button>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-2">My Sessions</h1>
+          <p className="text-gray-600 dark:text-slate-400">Manage your upcoming and completed learning sessions</p>
+        </div>
+
+        {/* Generated Live Session Code */}
+        {generatedLiveSession && (
+          <div className="mb-8">
+            <LiveSessionCode 
+              liveSessionData={generatedLiveSession}
+              onJoinSession={handleJoinLiveSession}
+            />
           </div>
-        </div>
+        )}
 
-        {/* Dynamic Sessions Content */}
-        <div className="space-y-4 sm:space-y-6">
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        {/* Upcoming Sessions */}
+        <section className="mb-12">
+          <div className="flex items-center mb-6">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100 flex items-center">
+              <Calendar className="w-6 h-6 mr-2 text-primary" />
+              Upcoming Sessions
+            </h2>
+            <span className="ml-3 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+              {sessions.upcoming.length}
+            </span>
+          </div>
+          
+          {sessions.upcoming.length > 0 ? (
+            <div className="space-y-4">
+              {sessions.upcoming.map(renderSessionCard)}
             </div>
-          ) : activeTab === 'upcoming' ? (
-            sessions.upcoming.length > 0 ? (
-              sessions.upcoming.map(session => renderSessionCard(session))
-            ) : (
-              <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-slate-100">No upcoming sessions</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Get started by scheduling a new session.</p>
-              </div>
-            )
-          ) : activeTab === 'completed' ? (
-            sessions.completed.length > 0 ? (
-              sessions.completed.map(session => renderSessionCard(session))
-            ) : (
-              <div className="text-center py-12">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-slate-100">No completed sessions</h3>
-                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Completed sessions will appear here.</p>
-              </div>
-            )
           ) : (
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-slate-100">No sessions in progress</h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">Sessions in progress will appear here.</p>
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center border border-gray-200 dark:border-slate-700">
+              <Calendar className="w-12 h-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-2">No Upcoming Sessions</h3>
+              <p className="text-gray-500 dark:text-slate-400 mb-4">You don't have any scheduled sessions yet.</p>
+              <Link to="/match" className="btn-primary">
+                Find a Mentor
+              </Link>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Quick Actions */}
-        <div className="mt-12 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-4">Quick Actions</h2>
-          <div className="flex justify-center space-x-4">
-            <button className="btn-primary">Schedule New Session</button>
-            <button className="btn-secondary">View Calendar</button>
+        {/* Completed Sessions */}
+        <section>
+          <div className="flex items-center mb-6">
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100 flex items-center">
+              <CheckCircle className="w-6 h-6 mr-2 text-primary" />
+              Completed Sessions
+            </h2>
+            <span className="ml-3 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
+              {sessions.completed.length}
+            </span>
           </div>
-        </div>
+          
+          {sessions.completed.length > 0 ? (
+            <div className="space-y-4">
+              {sessions.completed.map(renderSessionCard)}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center border border-gray-200 dark:border-slate-700">
+              <CheckCircle className="w-12 h-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-2">No Completed Sessions</h3>
+              <p className="text-gray-500 dark:text-slate-400 mb-4">You haven't completed any sessions yet.</p>
+              <Link to="/match" className="btn-primary">
+                Find a Mentor
+              </Link>
+            </div>
+          )}
+        </section>
       </main>
 
+      {/* Live Session Modal */}
+      {liveSessionModal.isOpen && (
+        <LiveSessionModal
+          session={liveSessionModal.session}
+          onClose={closeLiveSessionModal}
+          onCodeGenerated={handleLiveSessionCodeGenerated}
+        />
+      )}
+
       {/* Feedback Modal */}
-      <FeedbackModal
-        isOpen={feedbackModal.isOpen}
-        onClose={closeFeedbackModal}
-        onSubmit={handleFeedbackSubmit}
-        sessionId={feedbackModal.sessionId}
-        userRole={feedbackModal.userRole}
-        existingFeedback={feedbackModal.existingFeedback}
-      />
+      {feedbackModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">Session Feedback</h3>
+            <p className="text-gray-600 dark:text-slate-400 mb-6">How was your session? Your feedback helps us improve.</p>
+            
+            <div className="feedback mb-6">
+              <label className="angry">
+                <input type="radio" name="feedback" />
+                <div>
+                  <svg className="eye" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                  <svg className="eye right" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                  <svg className="mouth" viewBox="0 0 18 7">
+                    <path d="M1,5.5 C1.83333333,7.16666667 3.16666667,8 5,8 C6.83333333,8 8.16666667,7.16666667 9,5.5 C9.83333333,7.16666667 11.1666667,8 13,8 C14.8333333,8 16.1666667,7.16666667 17,5.5" />
+                  </svg>
+                </div>
+              </label>
+              <label className="sad">
+                <input type="radio" name="feedback" />
+                <div>
+                  <svg className="eye" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                  <svg className="eye right" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                  <svg className="mouth" viewBox="0 0 18 7">
+                    <path d="M1,1 C1.83333333,2.16666667 3.16666667,2.75 5,2.75 C6.83333333,2.75 8.16666667,2.16666667 9,1 C9.83333333,2.16666667 11.1666667,2.75 13,2.75 C14.8333333,2.75 16.1666667,2.16666667 17,1" />
+                  </svg>
+                </div>
+              </label>
+              <label className="ok">
+                <input type="radio" name="feedback" />
+                <div></div>
+              </label>
+              <label className="good">
+                <input type="radio" name="feedback" />
+                <div>
+                  <svg className="eye" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                  <svg className="eye right" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                  <svg className="mouth" viewBox="0 0 18 7">
+                    <path d="M1,5.5 C1.83333333,4.33333333 3.16666667,3.75 5,3.75 C6.83333333,3.75 8.16666667,4.33333333 9,5.5" />
+                  </svg>
+                </div>
+              </label>
+              <label className="happy">
+                <input type="radio" name="feedback" />
+                <div>
+                  <svg className="eye" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                  <svg className="eye right" viewBox="0 0 7 4">
+                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
+                  </svg>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closeFeedbackModal}
+                className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={closeFeedbackModal}
+                className="btn-primary"
+              >
+                Submit Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
 
 export default Sessions;

@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const { ExpressPeerServer } = require('peer');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 // Initialize MongoDB connection
@@ -13,6 +14,9 @@ const chatRoutes = require('./routes/chat');
 const sessionsRoutes = require('./routes/sessions');
 const blockchainRoutes = require('./routes/blockchain');
 const matchingRoutes = require('./routes/matching');
+const adminRoutes = require('./routes/admin');
+const skillsRoutes = require('./routes/skills');
+const { router: signalingRoutes, initializeSocket } = require('./routes/signaling');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,6 +25,9 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(db => {
   if (db) {
     console.log('✅ Database connection ready');
+    // Initialize database collections and indexes
+    const { initializeDatabase } = require('./utils/databaseMigration');
+    initializeDatabase();
   }
 }).catch(err => {
   console.error('❌ Database connection failed:', err.message);
@@ -42,6 +49,8 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/sessions', sessionsRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/matching', matchingRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/skills', skillsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -55,6 +64,14 @@ app.get('/api/health', (req, res) => {
 // Default root route
 app.get('/', (req, res) => {
   res.send('BlockLearn Backend is running!');
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found: ' + req.path
+  });
 });
 
 // Error handling middleware
@@ -71,11 +88,49 @@ const server = app.listen(PORT, () => {
   console.log(`Health check available at: http://localhost:${PORT}/api/health`);
 });
 
+// Initialize socket.io with the HTTP server
+initializeSocket(server);
+
+// Create a separate HTTP server for PeerJS to avoid conflicts
+const http = require('http');
+const peerServerInstance = http.createServer();
+const peerServer = ExpressPeerServer(peerServerInstance, {
+  debug: true,
+  path: '/peerjs',
+  // Ensure PeerJS and Socket.IO don't conflict
+  proxied: false,
+  // Add additional configuration to prevent conflicts
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Start PeerJS server on a different port
+const PEER_PORT = process.env.PEER_PORT || 5001;
+peerServerInstance.listen(PEER_PORT, () => {
+  console.log(`PeerJS server running on port ${PEER_PORT}`);
+});
+
+app.use('/peerjs', peerServer);
+
+peerServer.on('connection', (client) => {
+  console.log('PeerJS client connected:', client.id);
+});
+
+peerServer.on('disconnect', (client) => {
+  console.log('PeerJS client disconnected:', client.id);
+});
+
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('Shutting down gracefully...');
   server.close(() => {
     console.log('Server closed');
-    process.exit(0);
+    peerServerInstance.close(() => {
+      console.log('PeerJS server closed');
+      process.exit(0);
+    });
   });
 });

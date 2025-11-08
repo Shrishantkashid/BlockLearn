@@ -38,7 +38,7 @@ const Index = () => {
   };
 
   const handleLogin = () => {
-    navigate('/login');
+    navigate('/prelogin');
   };
 
   const handleBrowseSkills = () => {
