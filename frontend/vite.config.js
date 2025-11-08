@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
+  root: '.', // Set the root to the current directory
   plugins: [react()],
   resolve: {
     alias: {
@@ -20,7 +21,7 @@ export default defineConfig({
   },
   // Add build configuration for Vercel
   build: {
-    outDir: 'dist',
+    outDir: '../dist', // Build to the parent directory's dist folder
     assetsDir: 'assets',
     rollupOptions: {
       output: {
@@ -33,5 +34,5 @@ export default defineConfig({
     }
   },
   // Add base path for Vercel deployments
-  base: './'
+  base: '/'
 })
