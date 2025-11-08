@@ -1,10 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const path = require('path');
 
 // Load environment variables
-require('dotenv').config({ path: path.resolve(__dirname, '../backend/.env') });
+require('dotenv').config();
 
 // Import routes
 const authRoutes = require('../backend/routes/auth');
