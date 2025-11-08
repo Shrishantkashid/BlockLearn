@@ -1,9 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const helmet = require('helmet');
-
-// Load environment variables
-require('dotenv').config();
 
 // Import routes
 const authRoutes = require('../backend/routes/auth');
@@ -19,7 +15,6 @@ const skillsRoutes = require('../backend/routes/skills');
 const app = express();
 
 // Middleware
-app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -47,23 +42,6 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'BlockLearn API is running!',
     timestamp: new Date().toISOString()
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found: ' + req.path
-  });
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    success: false,
-    message: 'Something went wrong!'
   });
 });
 

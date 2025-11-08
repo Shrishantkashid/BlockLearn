@@ -7,31 +7,20 @@
   "builds": [
     {
       "src": "api/[[...all]].js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "backend/**",
-          "api/**"
-        ]
-      }
-    },
-    {
-      "src": "api/health.js",
       "use": "@vercel/node"
     },
     {
-      "src": "frontend/dist/**/*",
-      "use": "@vercel/static"
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "/api/[[...all]].js"
-    },
-    {
-      "src": "/health",
-      "dest": "/api/health.js"
     },
     {
       "src": "/(.*)",
