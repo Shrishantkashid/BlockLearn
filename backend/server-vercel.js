@@ -16,17 +16,39 @@ const blockchainRoutes = require('./routes/blockchain');
 const matchingRoutes = require('./routes/matching');
 const adminRoutes = require('./routes/admin');
 const skillsRoutes = require('./routes/skills');
-const { router: signalingRoutes, initializeSocket } = require('./routes/signaling');
 
 // Create express app
 const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  credentials: true
-}));
+
+// Enhanced CORS configuration for Vercel deployment
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // List of allowed origins
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:5174',
+      'https://blocklearn.vercel.app', // Replace with your actual Vercel URL
+      process.env.FRONTEND_URL, // Environment variable for custom domain
+    ].filter(Boolean); // Remove any falsy values
+    
+    // Check if the origin is in our allowed list or is a Vercel preview URL
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -71,9 +93,6 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Export the app for Vercel
-module.exports = app;
-
 // For local development
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
@@ -95,50 +114,9 @@ if (require.main === module) {
     console.log(`Health check available at: http://localhost:${PORT}/api/health`);
   });
   
-  // Initialize socket.io with the HTTP server
-  initializeSocket(server);
-  
-  // Create a separate HTTP server for PeerJS to avoid conflicts
-  const http = require('http');
-  const peerServerInstance = http.createServer();
-  const peerServer = ExpressPeerServer(peerServerInstance, {
-    debug: true,
-    path: '/peerjs',
-    // Ensure PeerJS and Socket.IO don't conflict
-    proxied: false,
-    // Add additional configuration to prevent conflicts
-    cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-      methods: ['GET', 'POST'],
-      credentials: true
-    }
-  });
-  
-  // Start PeerJS server on a different port
-  const PEER_PORT = process.env.PEER_PORT || 5001;
-  peerServerInstance.listen(PEER_PORT, () => {
-    console.log(`PeerJS server running on port ${PEER_PORT}`);
-  });
-  
-  app.use('/peerjs', peerServer);
-  
-  peerServer.on('connection', (client) => {
-    console.log('PeerJS client connected:', client.id);
-  });
-  
-  peerServer.on('disconnect', (client) => {
-    console.log('PeerJS client disconnected:', client.id);
-  });
-  
-  // Graceful shutdown
-  process.on('SIGINT', () => {
-    console.log('Shutting down gracefully...');
-    server.close(() => {
-      console.log('Server closed');
-      peerServerInstance.close(() => {
-        console.log('PeerJS server closed');
-        process.exit(0);
-      });
-    });
-  });
+  // Note: Socket.IO and PeerJS won't work in Vercel serverless functions
+  // They need to be handled separately or use a different approach for real-time features
 }
+
+// Export the app for Vercel
+module.exports = app;

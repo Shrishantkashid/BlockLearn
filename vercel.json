@@ -1,15 +1,13 @@
 {
   "version": 2,
   "public": false,
+  "github": {
+    "silent": true
+  },
   "builds": [
     {
-      "src": "backend/server-vercel.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "backend/**"
-        ]
-      }
+      "src": "api/[[...all]].js",
+      "use": "@vercel/node"
     },
     {
       "src": "frontend/package.json",
@@ -22,25 +20,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/backend/server-vercel.js"
-    },
-    {
-      "src": "/socket.io/(.*)",
-      "dest": "/backend/server-vercel.js"
-    },
-    {
-      "src": "/peerjs/(.*)",
-      "dest": "/backend/server-vercel.js"
+      "dest": "/api/[[...all]].js"
     },
     {
       "src": "/(.*)",
       "dest": "/frontend/dist/$1"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "github": {
-    "silent": true
-  }
+  ]
 }

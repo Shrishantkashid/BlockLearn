@@ -31,5 +31,7 @@ export default defineConfig({
         }
       }
     }
-  }
+  },
+  // Add base path for Vercel deployments
+  base: '/'
 })
