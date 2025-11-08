@@ -16,6 +16,7 @@ const blockchainRoutes = require('./routes/blockchain');
 const matchingRoutes = require('./routes/matching');
 const adminRoutes = require('./routes/admin');
 const skillsRoutes = require('./routes/skills');
+const mentorRoutes = require('./routes/mentor');
 const { router: signalingRoutes, initializeSocket } = require('./routes/signaling');
 
 const app = express();
@@ -74,6 +75,7 @@ app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/matching', matchingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/skills', skillsRoutes);
+app.use('/api/mentor', mentorRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

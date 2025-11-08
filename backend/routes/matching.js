@@ -444,4 +444,183 @@ router.get("/training-data", authenticateToken, async (req, res) => {
   }
 });
 
+// ✅ Advanced mentor search with multiple filters
+router.get("/mentors-advanced", authenticateToken, async (req, res) => {
+  try {
+    const { skillId, name, campus, minMatchScore } = req.query;
+    const studentId = req.user.id;
+    
+    // Validate inputs
+    if (!skillId && !name && !campus) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one search parameter (skillId, name, or campus) is required"
+      });
+    }
+    
+    // Get database connection
+    const db = await connectDB();
+    const usersCollection = db.collection('users');
+    const profilesCollection = db.collection('user_profiles');
+    const userSkillsCollection = db.collection('user_skills');
+    
+    // Get student profile
+    const studentUser = await usersCollection.findOne({ _id: new ObjectId(studentId) });
+    
+    if (!studentUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Student user not found"
+      });
+    }
+    
+    // Get student profile (may not exist for new users)
+    const studentProfile = await profilesCollection.findOne({ user_id: new ObjectId(studentId) });
+
+    const student = {
+      ...studentUser,
+      ...(studentProfile || {}), // Merge profile data if it exists
+      userId: studentId
+    };
+    
+    let mentors = [];
+    
+    // If searching by skill
+    if (skillId) {
+      // Get all mentors who offer this skill
+      const mentorUserSkills = await userSkillsCollection.find({
+        skill_id: new ObjectId(skillId),
+        skill_type: 'offered',
+        user_id: { $ne: new ObjectId(studentId) } // Don't match student with themselves
+      }).toArray();
+      
+      if (mentorUserSkills.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          message: "No mentors found for this skill"
+        });
+      }
+      
+      // Get unique mentor IDs
+      const mentorIds = [...new Set(mentorUserSkills.map(skill => skill.user_id.toString()))];
+      
+      // Get mentor details
+      for (const mentorId of mentorIds) {
+        const mentorUser = await usersCollection.findOne({ _id: new ObjectId(mentorId) });
+        const mentorProfile = await profilesCollection.findOne({ user_id: new ObjectId(mentorId) });
+        
+        if (mentorUser) {
+          mentors.push({
+            user_id: mentorId,
+            first_name: mentorUser.first_name,
+            last_name: mentorUser.last_name,
+            email: mentorUser.email,
+            campus: mentorProfile ? mentorProfile.campus : null,
+            availability: mentorProfile ? mentorProfile.availability : null,
+            bio: mentorProfile ? mentorProfile.bio : null,
+            avatar_url: mentorProfile ? mentorProfile.avatar_url : null
+          });
+        }
+      }
+    } else {
+      // If not searching by skill, get all mentors
+      const mentorUsers = await usersCollection.find({ 
+        user_type: 'mentor',
+        _id: { $ne: new ObjectId(studentId) },
+        mentor_approved: true
+      }).toArray();
+      
+      for (const mentorUser of mentorUsers) {
+        const mentorProfile = await profilesCollection.findOne({ user_id: new ObjectId(mentorUser._id) });
+        
+        mentors.push({
+          user_id: mentorUser._id.toString(),
+          first_name: mentorUser.first_name,
+          last_name: mentorUser.last_name,
+          email: mentorUser.email,
+          campus: mentorProfile ? mentorProfile.campus : null,
+          availability: mentorProfile ? mentorProfile.availability : null,
+          bio: mentorProfile ? mentorProfile.bio : null,
+          avatar_url: mentorProfile ? mentorProfile.avatar_url : null
+        });
+      }
+    }
+    
+    // Apply additional filters
+    if (name) {
+      const nameRegex = new RegExp(name, 'i'); // Case insensitive
+      mentors = mentors.filter(mentor => 
+        nameRegex.test(mentor.first_name) || nameRegex.test(mentor.last_name) || 
+        nameRegex.test(`${mentor.first_name} ${mentor.last_name}`)
+      );
+    }
+    
+    if (campus) {
+      const campusRegex = new RegExp(campus, 'i'); // Case insensitive
+      mentors = mentors.filter(mentor => 
+        mentor.campus && campusRegex.test(mentor.campus)
+      );
+    }
+    
+    // Calculate match scores for each mentor
+    const mentorsWithScores = [];
+    const sessionRequest = { skillId: skillId };
+    
+    for (const mentor of mentors) {
+      const matchScore = skillId ? 
+        await calculateMatchScore(student, mentor, sessionRequest) : 
+        { totalScore: 0.5, breakdown: {} }; // Default score if no skill match
+      
+      // Record match for ML training data (only if searching by skill)
+      if (skillId) {
+        await MatchingService.recordMatch(
+          studentId,
+          mentor.user_id,
+          skillId,
+          matchScore.totalScore,
+          matchScore.breakdown
+        );
+      }
+      
+      mentorsWithScores.push({
+        user: {
+          id: mentor.user_id,
+          first_name: mentor.first_name,
+          last_name: mentor.last_name,
+          email: mentor.email,
+          avatar_url: mentor.avatar_url
+        },
+        profile: {
+          campus: mentor.campus,
+          bio: mentor.bio
+        },
+        matchScore: matchScore.totalScore,
+        scoreBreakdown: matchScore.breakdown
+      });
+    }
+    
+    // Apply minimum match score filter
+    if (minMatchScore) {
+      const filteredMentors = mentorsWithScores.filter(mentor => mentor.matchScore >= parseFloat(minMatchScore));
+      mentorsWithScores.splice(0, mentorsWithScores.length, ...filteredMentors);
+    }
+    
+    // Sort by match score (highest first)
+    mentorsWithScores.sort((a, b) => b.matchScore - a.matchScore);
+    
+    res.json({
+      success: true,
+      data: mentorsWithScores
+    });
+    
+  } catch (error) {
+    console.error("Error getting mentors:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error: " + error.message
+    });
+  }
+});
+
 module.exports = router;

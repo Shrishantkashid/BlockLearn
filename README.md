@@ -1,9 +1,6 @@
-# BlockLearn
+# BlockLearn - Decentralized Skill Exchange Platform
 
 A decentralized peer-to-peer skill exchange platform combining web3 and real-time communication.
-
-## Overview
-
 BlockLearn is a innovative platform that connects learners with mentors for skill exchanges using blockchain technology for verification and reputation management. The platform features real-time video calling, chat functionality, and a smart matching algorithm to connect users with complementary skills.
 
 ## Features
@@ -14,6 +11,7 @@ BlockLearn is a innovative platform that connects learners with mentors for skil
 - **Blockchain Integration**: Skill completion tracking and reputation management
 - **Feedback System**: Post-session ratings and reviews
 - **Admin Panel**: User management and moderation tools
+- **Mentor-Admin Video Calling**: Secure video conferencing between mentors and administrators
 
 ## Technologies Used
 
@@ -35,123 +33,107 @@ BlockLearn is a innovative platform that connects learners with mentors for skil
 - Solidity smart contracts
 - Hardhat for deployment and testing
 
-## Project Structure
-
-```
-.
-├── backend/          # Backend API and server
-├── frontend/         # Frontend React application
-├── contracts/        # Solidity smart contracts
-├── scripts/          # Deployment scripts
-└── testsprite_tests/ # Automated tests
-```
-
-## Development Setup
+## Getting Started
 
 ### Prerequisites
 - Node.js (v16 or higher)
-- MongoDB database
-- npm or yarn package manager
+- MongoDB
+- npm or yarn
 
 ### Installation
 
 1. Clone the repository:
-```bash
-git clone <repository-url>
-cd blocklearn
-```
+   ```bash
+   git clone <repository-url>
+   ```
 
 2. Install backend dependencies:
-```bash
-cd backend
-npm install
-cd ..
-```
+   ```bash
+   cd backend
+   npm install
+   ```
 
 3. Install frontend dependencies:
-```bash
-cd frontend
-npm install
-cd ..
+   ```bash
+   cd frontend
+   npm install
+   ```
+
+4. Set up environment variables (see `.env.example` files)
+
+5. Start the development servers:
+   ```bash
+   # In backend directory
+   npm run dev
+   
+   # In frontend directory
+   npm run dev
+   ```
+
+## Project Structure
+
+```
+.
+├── backend/          # Backend API and Socket.IO server
+├── frontend/         # React frontend application
+├── contracts/        # Solidity smart contracts
+├── scripts/          # Deployment and utility scripts
+└── tests/            # Test files
 ```
 
-4. Install root dependencies:
-```bash
-npm install
-```
+## Key Features Implementation
 
-### Environment Setup
+### User Authentication
+- Email/Password registration with OTP verification
+- Google OAuth integration
+- JWT-based session management
 
-1. Create a `.env` file in the `backend` directory with the following variables:
-```
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret_key
-EMAIL_USER=your_email_for_notifications
-EMAIL_PASS=your_email_password
-FRONTEND_URL=http://localhost:5173
-```
+### Skill Matching
+- Algorithmic matching based on user skills and interests
+- Real-time matching updates
+- Profile-based recommendations
 
-2. Create a `.env` file in the `frontend` directory with the following variables:
-```
-VITE_API_URL=http://localhost:5000
-```
+### Real-time Communication
+- Socket.IO for chat functionality
+- WebRTC for peer-to-peer video calling
+- Multi-user video conferencing support
 
-### Running the Application
+### Blockchain Integration
+- Skill completion verification using smart contracts
+- Reputation system with token rewards
+- Certificate issuance and verification
 
-1. Start the development server:
-```bash
-npm run dev
-```
+### Admin Panel
+- User management dashboard
+- Session monitoring
+- Content moderation tools
 
-This will start both the backend and frontend servers concurrently.
+### Mentor-Admin Video Calling
+- Secure peer-to-peer video conferencing
+- Role-based access control
+- Session code sharing for easy connection
+- Real-time chat during calls
 
-Alternatively, you can start them separately:
+## Development Guidelines
 
-Backend:
-```bash
-cd backend
-npm run dev
-```
+### Code Style
+- Follow Airbnb JavaScript style guide
+- Use Tailwind CSS for styling
+- Component-based architecture
 
-Frontend:
-```bash
-cd frontend
-npm run dev
-```
+### Testing
+- Unit tests with Jest
+- Integration tests for API endpoints
+- End-to-end tests with Cypress
 
-## Deployment
+### Deployment
+- Vercel for frontend deployment
+- Heroku or similar for backend deployment
+- MongoDB Atlas for database hosting
 
-### Vercel Deployment
+## API Documentation
 
-The project is configured for deployment to Vercel. See the individual README files in the `frontend` and `backend` directories for detailed deployment instructions.
-
-### Environment Variables for Production
-
-Make sure to set the following environment variables in your production environment:
-
-Backend:
-- `MONGODB_URI`
-- `JWT_SECRET`
-- `EMAIL_USER`
-- `EMAIL_PASS`
-- `FRONTEND_URL`
-
-Frontend:
-- `VITE_API_URL`
-
-## Testing
-
-Run automated tests:
-```bash
-npm test
-```
-
-## Smart Contracts
-
-Deploy smart contracts:
-```bash
-npx hardhat run scripts/deploy-skillswap.js
-```
+See `API_DOCS.md` for detailed API endpoint documentation.
 
 ## Contributing
 
@@ -159,8 +141,12 @@ npx hardhat run scripts/deploy-skillswap.js
 2. Create a feature branch
 3. Commit your changes
 4. Push to the branch
-5. Create a pull request
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the `LICENSE` file for details.
+
+## Support
+
+For support, please open an issue on the GitHub repository or contact the development team.

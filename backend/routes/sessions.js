@@ -1,7 +1,9 @@
-const express = require("express");
-const { authenticateToken } = require("../middleware/auth");
-const { connectDB } = require("../config/database");
-const MatchingService = require("../utils/matchingService");
+const express = require('express');
+const { ObjectId } = require('mongodb');
+const { connectDB } = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
+const MatchingService = require('../utils/matchingService');
+const { sendSessionScheduledEmail } = require('../config/email');
 
 const router = express.Router();
 
@@ -155,6 +157,26 @@ router.post("/", authenticateToken, async (req, res) => {
 
     // Record session outcome (initially connected = true since session was created)
     await MatchingService.recordSessionOutcome(session._id, true);
+
+    // Send email notifications to both learner and mentor
+    try {
+      await sendSessionScheduledEmail(
+        req.user.email,
+        req.user.first_name,
+        mentor.email,
+        mentor.first_name,
+        {
+          skillName: skill.name,
+          scheduledAt: session.scheduled_at,
+          durationMinutes: session.duration_minutes,
+          location: session.location,
+          notes: session.notes
+        }
+      );
+    } catch (emailError) {
+      console.error('Error sending session scheduled emails:', emailError);
+      // Don't fail the session creation if email sending fails
+    }
 
     res.status(201).json({
       success: true,
@@ -361,18 +383,6 @@ router.get("/validate-live-code/:code", async (req, res) => {
 
     // Get database connection
     const db = await connectDB();
-    
-    // Check if we're using a mock database
-    if (!db || typeof db.collection !== 'function') {
-      // Return mock data for development
-      console.log("Using mock database - returning mock live session data");
-      return res.json({
-        success: true,
-        meetingLink: `http://localhost:5173/session/live/${code}`,
-        liveSessionCode: code,
-        createdAt: new Date()
-      });
-    }
     
     const sessionsCollection = db.collection('sessions');
 

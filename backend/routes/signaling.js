@@ -147,7 +147,13 @@ const initializeSocket = (server) => {
         console.log('Users already in room:', usersInRoom);
         // If there are other users in the room, notify the new user about them
         usersInRoom.forEach(userId => {
+          // Notify the new user about existing users
           socket.emit('user-joined', userId);
+          // Also notify existing users about the new user (in case they missed it)
+          const existingSocket = io.sockets.sockets.get(userId);
+          if (existingSocket) {
+            existingSocket.emit('user-joined', socket.id);
+          }
         });
       }
     });
@@ -157,6 +163,19 @@ const initializeSocket = (server) => {
       console.log('User', socket.id, 'leaving room:', roomId);
       socket.leave(roomId);
       socket.to(roomId).emit('user-left', socket.id);
+    });
+
+    // Handle chat messages
+    socket.on('message', (data) => {
+      console.log('Received message from:', socket.id, 'in room:', data.roomId, 'message:', data.message);
+      // Broadcast message to all users in the room except sender
+      if (data.roomId) {
+        socket.to(data.roomId).emit('message', {
+          message: data.message,
+          sender: socket.id, // Include sender ID at the top level for consistency
+          timestamp: data.message?.timestamp || new Date().toLocaleTimeString()
+        });
+      }
     });
 
     // Handle disconnect

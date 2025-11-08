@@ -10,9 +10,20 @@ import {
   Wallet,
   ArrowLeft
 } from 'lucide-react';
+import api from '../api';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
+  const [stats, setStats] = useState({
+    skills: 0,
+    sessionsCompleted: 0,
+    certificates: 0,
+    walletConnected: false
+  });
+  const [recentSessions, setRecentSessions] = useState([]);
+  const [skillsProgress, setSkillsProgress] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -27,23 +38,102 @@ const Dashboard = () => {
 
   useEffect(() => {
     console.log("Dashboard useEffect triggered");
-    // Check if we have user data and try to get real user data
-    const userData = JSON.parse(localStorage.getItem("userData") || "{}");
-    const token = localStorage.getItem("token");
-    
-    if (userData && (userData.id || userData._id)) {
-      // Check if profile is complete
-      if (!userData.profileComplete) {
-        navigate("/profile");
-        return;
-      }
-      
-      setUser(userData);
-    } else {
-      // No saved data, redirect to login
-      navigate("/login");
-    }
+    fetchDashboardData();
   }, [navigate]);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      // Get current user data
+      const userResponse = await api.get('/api/auth/me');
+      
+      if (userResponse.data.success && userResponse.data.user) {
+        const currentUser = userResponse.data.user;
+        setUser(currentUser);
+        
+        // Check if profile is complete
+        if (!currentUser.profileComplete) {
+          navigate("/profile");
+          return;
+        }
+        
+        // Fetch user sessions
+        const sessionsResponse = await api.get('/api/sessions');
+        if (sessionsResponse.data.success) {
+          const sessions = sessionsResponse.data.data;
+          
+          // Calculate stats
+          const completedSessions = sessions.filter(session => session.status === 'completed').length;
+          const upcomingSessions = sessions.filter(session => session.status === 'scheduled').length;
+          
+          setStats({
+            skills: 3, // This would need to come from a skills API
+            sessionsCompleted: completedSessions,
+            certificates: 2, // This would need to come from a certificates API
+            walletConnected: true // This would need to come from a wallet API
+          });
+          
+          // Set recent sessions (last 2)
+          const sortedSessions = [...sessions].sort((a, b) => 
+            new Date(b.scheduled_at) - new Date(a.scheduled_at)
+          );
+          setRecentSessions(sortedSessions.slice(0, 2));
+          
+          // Set skills progress (hardcoded for now, but would come from API)
+          setSkillsProgress([
+            { name: 'JavaScript', progress: 75, level: 'Intermediate' },
+            { name: 'React', progress: 60, level: 'Intermediate' },
+            { name: 'Node.js', progress: 40, level: 'Beginner' }
+          ]);
+        }
+      } else {
+        // No user data, redirect to login
+        navigate("/login");
+      }
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setError("Failed to load dashboard data");
+      // Try to use localStorage as fallback
+      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+      if (userData && (userData.id || userData._id)) {
+        setUser(userData);
+      } else {
+        navigate("/login");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-8 shadow-lg max-w-md w-full text-center">
+          <div className="text-red-500 dark:text-red-400 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Error Loading Dashboard</h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
+          <button
+            onClick={fetchDashboardData}
+            className="btn-primary px-6 py-3"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -98,7 +188,7 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-2">
-            Welcome back, {user.first_name || user.firstName}!
+            Welcome back, {user.firstName || user.first_name}!
           </h1>
           <p className="text-gray-600 dark:text-slate-400">
             Ready to continue your learning journey?
@@ -138,7 +228,7 @@ const Dashboard = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Skills Learning</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">3</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{stats.skills}</p>
               </div>
             </div>
           </div>
@@ -150,7 +240,7 @@ const Dashboard = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Sessions Completed</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">5</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{stats.sessionsCompleted}</p>
               </div>
             </div>
           </div>
@@ -162,7 +252,7 @@ const Dashboard = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Certificates</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">2</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">{stats.certificates}</p>
               </div>
             </div>
           </div>
@@ -174,7 +264,9 @@ const Dashboard = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Wallet Connected</p>
-                <p className="text-sm font-semibold text-green-600 dark:text-green-400">Yes</p>
+                <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                  {stats.walletConnected ? 'Yes' : 'No'}
+                </p>
               </div>
             </div>
           </div>
@@ -186,25 +278,25 @@ const Dashboard = () => {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">Recent Sessions</h2>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-slate-100">JavaScript Fundamentals</h3>
-                  <p className="text-sm text-gray-600 dark:text-slate-400">with Jane Smith</p>
-                </div>
-                <span className="px-2 py-1 bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 text-xs rounded-full">
-                  Completed
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                <div>
-                  <h3 className="font-medium text-gray-900 dark:text-slate-100">React Hooks</h3>
-                  <p className="text-sm text-gray-600 dark:text-slate-400">with Mike Johnson</p>
-                </div>
-                <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 text-xs rounded-full">
-                  Upcoming
-                </span>
-              </div>
+              {recentSessions.length > 0 ? (
+                recentSessions.map((session) => (
+                  <div key={session.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-slate-100">{session.skill?.name || 'Session'}</h3>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">with {session.mentor?.firstName} {session.mentor?.lastName}</p>
+                    </div>
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      session.status === 'completed' 
+                        ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' 
+                        : 'bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400'
+                    }`}>
+                      {session.status === 'completed' ? 'Completed' : 'Upcoming'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 dark:text-slate-400">No recent sessions</p>
+              )}
             </div>
             <Link to="/sessions" className="mt-4 inline-block text-primary hover:text-primary/80 font-medium">
               View all sessions →
@@ -215,35 +307,21 @@ const Dashboard = () => {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">Skills Progress</h2>
             <div className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-slate-100">JavaScript</span>
-                  <span className="text-sm text-gray-600 dark:text-slate-400">75%</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: '75%' }}></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-slate-100">React</span>
-                  <span className="text-sm text-gray-600 dark:text-slate-400">60%</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: '60%' }}></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium text-gray-900 dark:text-slate-100">Node.js</span>
-                  <span className="text-sm text-gray-600 dark:text-slate-400">40%</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full" style={{ width: '40%' }}></div>
-                </div>
-              </div>
+              {skillsProgress.length > 0 ? (
+                skillsProgress.map((skill, index) => (
+                  <div key={index}>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-slate-100">{skill.name}</span>
+                      <span className="text-sm text-gray-600 dark:text-slate-400">{skill.progress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+                      <div className="bg-primary h-2 rounded-full" style={{ width: `${skill.progress}%` }}></div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 dark:text-slate-400">No skills progress data available</p>
+              )}
             </div>
           </div>
         </div>

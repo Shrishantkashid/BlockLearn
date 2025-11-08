@@ -1,50 +1,99 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { 
   User, 
   BookOpen, 
   Target, 
   Heart, 
   ArrowLeft,
-  Edit3
+  Calendar,
+  Clock,
+  Award,
+  MessageSquare,
+  Users,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
-import api from '../api';
+import api, { connectWithMentor } from '../api';
+import MentorSessionScheduling from '../components/MentorSessionScheduling';
 
-const ProfileView = () => {
-  const [profile, setProfile] = useState(null);
+const MentorProfileView = () => {
+  const [mentor, setMentor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState(null);
+  const [connectionId, setConnectionId] = useState(null);
+  const [showScheduling, setShowScheduling] = useState(false);
   const navigate = useNavigate();
+  const { mentorId } = useParams();
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (mentorId) {
+      fetchMentorProfile(mentorId);
+    } else {
+      setError("No mentor specified");
+      setLoading(false);
+    }
+  }, [mentorId]);
 
-  const fetchProfile = async () => {
+  const fetchMentorProfile = async (id) => {
     try {
       setLoading(true);
-      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
-      const userId = userData?.id || userData?._id;
-      const token = localStorage.getItem("token");
-
-      if (!userId || !token) {
-        navigate("/login");
-        setLoading(false);
-        return;
-      }
-
-      const response = await api.get(`/api/auth/profile/${userId}`);
+      const response = await api.get(`/api/auth/profile/${id}`);
       if (response.data.success) {
-        setProfile(response.data);
+        setMentor(response.data);
+        // Check if there's an existing connection
+        checkConnectionStatus(id);
       } else {
-        setError(response.data.message || "Failed to load profile");
+        setError(response.data.message || "Failed to load mentor profile");
       }
     } catch (err) {
-      console.error("Fetch profile error:", err);
-      setError("Failed to load profile. Please try again.");
+      console.error("Fetch mentor profile error:", err);
+      setError("Failed to load mentor profile. Please try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkConnectionStatus = async (id) => {
+    try {
+      const response = await api.get('/api/mentor/learner-connections');
+      if (response.data.success) {
+        const connections = response.data.data;
+        const existingConnection = connections.find(conn => 
+          conn.mentor.id === id && conn.status === 'accepted'
+        );
+        if (existingConnection) {
+          setConnectionId(existingConnection.id);
+          setShowScheduling(true);
+        }
+      }
+    } catch (err) {
+      console.error("Error checking connection status:", err);
+    }
+  };
+
+  const handleConnect = async () => {
+    try {
+      setIsConnecting(true);
+      const response = await connectWithMentor(mentor.user.id);
+      if (response.success) {
+        setConnectionStatus("Request sent successfully! The mentor will review your request.");
+      } else {
+        setConnectionStatus("Failed to send request: " + response.message);
+      }
+    } catch (err) {
+      console.error("Connection error:", err);
+      setConnectionStatus("Failed to send request. Please try again.");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  const handleSessionScheduled = (sessionData) => {
+    // Handle successful session scheduling
+    setConnectionStatus("Session scheduled successfully! Check your sessions page for details.");
   };
 
   if (loading) {
@@ -67,17 +116,17 @@ const ProfileView = () => {
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Error</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/match")}
             className="btn-primary px-6 py-3"
           >
-            Back to Dashboard
+            Back to Matching
           </button>
         </div>
       </div>
     );
   }
 
-  if (!profile) {
+  if (!mentor) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="bg-white dark:bg-slate-800 rounded-lg p-8 shadow-lg max-w-md w-full text-center">
@@ -87,20 +136,20 @@ const ProfileView = () => {
             </svg>
           </div>
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Profile Not Found</h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-6">No profile data available for this user.</p>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">No profile data available for this mentor.</p>
           <button
-            onClick={() => navigate("/profile")}
+            onClick={() => navigate("/match")}
             className="btn-primary px-6 py-3"
           >
-            Create Profile
+            Back to Matching
           </button>
         </div>
       </div>
     );
   }
 
-  const userProfile = profile.profile;
-  const user = profile.user;
+  const userProfile = mentor.profile;
+  const user = mentor.user;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -109,24 +158,17 @@ const ProfileView = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
           <div className="flex items-center space-x-4">
             <Link
-              to="/dashboard"
+              to="/match"
               className="inline-flex items-center space-x-2 text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span>Back to Dashboard</span>
+              <span>Back to Matching</span>
             </Link>
             <div className="hidden sm:block text-gray-300 dark:text-slate-600">|</div>
             <div className="text-sm text-gray-500 dark:text-slate-400">
-              <span className="text-gray-900 dark:text-slate-100 font-medium">Profile Details</span>
+              <span className="text-gray-900 dark:text-slate-100 font-medium">Mentor Profile</span>
             </div>
           </div>
-          <button
-            onClick={() => navigate("/profile")}
-            className="btn-primary px-4 py-2 flex items-center space-x-2"
-          >
-            <Edit3 className="w-4 h-4" />
-            <span>Edit Profile</span>
-          </button>
         </div>
 
         {/* Profile Card */}
@@ -142,11 +184,43 @@ const ProfileView = () => {
                 </h1>
                 <p className="text-primary-100 mt-1">{user.email}</p>
                 <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/20 text-white">
-                  <span>Profile Complete</span>
+                  <span>Mentor Profile</span>
                 </div>
+              </div>
+              <div className="mt-4 sm:mt-0 sm:ml-auto">
+                {!showScheduling ? (
+                  <button
+                    onClick={handleConnect}
+                    disabled={isConnecting}
+                    className="btn-primary px-6 py-3 flex items-center space-x-2"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Sending Request...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Users className="w-4 h-4" />
+                        <span>Connect with Mentor</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <div className="flex items-center space-x-2 px-4 py-2 bg-green-500/20 text-green-100 rounded-lg">
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Connected</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
+
+          {connectionStatus && (
+            <div className="px-6 py-4 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
+              <p className="text-blue-800 dark:text-blue-200 text-center">{connectionStatus}</p>
+            </div>
+          )}
 
           <div className="px-6 py-8 sm:px-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -159,15 +233,15 @@ const ProfileView = () => {
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Full Name</p>
-                    <p className="text-gray-900 dark:text-slate-100">{userProfile.full_name || userProfile.fullName}</p>
+                    <p className="text-gray-900 dark:text-slate-100">{userProfile.full_name || userProfile.fullName || `${user.firstName} ${user.lastName}`}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-slate-400">School/College</p>
-                    <p className="text-gray-900 dark:text-slate-100">{userProfile.school_name || userProfile.schoolName}</p>
+                    <p className="text-gray-900 dark:text-slate-100">{userProfile.school_name || userProfile.schoolName || "Not specified"}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Grade/Year</p>
-                    <p className="text-gray-900 dark:text-slate-100">{userProfile.grade}</p>
+                    <p className="text-gray-900 dark:text-slate-100">{userProfile.grade || "Not specified"}</p>
                   </div>
                 </div>
               </div>
@@ -188,39 +262,39 @@ const ProfileView = () => {
                 </div>
               </div>
 
-              {/* Skills & Learning */}
+              {/* Skills & Expertise */}
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4 flex items-center">
                   <Target className="w-5 h-5 mr-2 text-primary" />
-                  Skills & Learning
+                  Skills & Expertise
                 </h2>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Skills to Learn</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Skills to Teach</p>
                     <p className="text-gray-900 dark:text-slate-100">
-                      {userProfile.skills_to_learn || "No skills specified"}
+                      {userProfile.skills_to_teach || userProfile.skillsToTeach || "No skills specified"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Skills to Teach</p>
+                    <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Experience</p>
                     <p className="text-gray-900 dark:text-slate-100">
-                      {userProfile.skills_to_teach || "No skills specified"}
+                      Not specified
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Goals & Interests */}
+              {/* Availability & Goals */}
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-4 flex items-center">
-                  <Heart className="w-5 h-5 mr-2 text-primary" />
-                  Goals & Interests
+                  <Calendar className="w-5 h-5 mr-2 text-primary" />
+                  Availability & Goals
                 </h2>
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm font-medium text-gray-500 dark:text-slate-400">Learning Goals</p>
                     <p className="text-gray-900 dark:text-slate-100">
-                      {userProfile.learning_goals || "No goals specified"}
+                      {userProfile.learning_goals || userProfile.learningGoals || "No goals specified"}
                     </p>
                   </div>
                   <div>
@@ -233,15 +307,42 @@ const ProfileView = () => {
               </div>
             </div>
 
-            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700 flex justify-end">
-              <button
-                onClick={() => navigate("/profile")}
-                className="btn-primary px-6 py-3 flex items-center space-x-2"
-              >
-                <Edit3 className="w-4 h-4" />
-                <span>Edit Profile</span>
-              </button>
-            </div>
+            {/* Session Scheduling Section */}
+            {showScheduling && (
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">
+                  Schedule a Session
+                </h2>
+                <MentorSessionScheduling 
+                  mentor={user} 
+                  skill={{ id: 'default', name: 'General Mentorship' }} 
+                  onSessionScheduled={handleSessionScheduled} 
+                />
+              </div>
+            )}
+
+            {/* Connect Button (if not showing scheduling) */}
+            {!showScheduling && (
+              <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700">
+                <button
+                  onClick={handleConnect}
+                  disabled={isConnecting}
+                  className="btn-primary px-6 py-3 flex items-center space-x-2 w-full justify-center sm:w-auto"
+                >
+                  {isConnecting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Sending Request...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Users className="w-4 h-4" />
+                      <span>Connect with Mentor</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -249,4 +350,4 @@ const ProfileView = () => {
   );
 };
 
-export default ProfileView;
+export default MentorProfileView;

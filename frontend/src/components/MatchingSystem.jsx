@@ -1,24 +1,44 @@
 import React, { useState, useEffect } from 'react';
-import { getMatchingMentors, getMatchDetail } from '../api';
+import { getMatchingMentors, getMatchDetail, searchMentors } from '../api';
+import { useNavigate } from 'react-router-dom';
 
-const MatchingSystem = ({ skillId, onMentorSelect }) => {
+const MatchingSystem = ({ skillId, searchFilters, onMentorSelect }) => {
   const [mentors, setMentors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [matchDetail, setMatchDetail] = useState(null);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (skillId) {
+    if (skillId || (searchFilters && (searchFilters.name || searchFilters.campus || searchFilters.minMatchScore))) {
       fetchMatchingMentors();
     }
-  }, [skillId]);
+  }, [skillId, searchFilters]);
 
   const fetchMatchingMentors = async () => {
     setLoading(true);
     setError('');
     try {
-      const response = await getMatchingMentors(skillId);
+      let response;
+      if (searchFilters && (searchFilters.name || searchFilters.campus || searchFilters.minMatchScore)) {
+        // Use advanced search
+        response = await searchMentors({
+          skillId: skillId || '',
+          name: searchFilters.name || '',
+          campus: searchFilters.campus || '',
+          minMatchScore: searchFilters.minMatchScore || ''
+        });
+      } else if (skillId) {
+        // Use basic skill-based search
+        response = await getMatchingMentors(skillId);
+      } else {
+        // No search criteria
+        setMentors([]);
+        setLoading(false);
+        return;
+      }
+      
       if (response.success) {
         setMentors(response.data || []);
       } else {
@@ -145,7 +165,10 @@ const MatchingSystem = ({ skillId, onMentorSelect }) => {
               )}
               
               <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
-                <button className="w-full btn-primary text-sm">
+                <button 
+                  className="w-full btn-primary text-sm"
+                  onClick={() => navigate(`/mentor/profile/${mentor.user.id}`)}
+                >
                   View Details
                 </button>
               </div>

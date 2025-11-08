@@ -1,7 +1,8 @@
-const express = require("express");
-const { authenticateToken } = require("../middleware/auth");
-const { connectDB } = require("../config/database");
+const express = require('express');
 const { ObjectId } = require('mongodb');
+const { connectDB } = require('../config/database');
+const { sendWelcomeEmail } = require('../config/email');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -58,7 +59,8 @@ router.get("/mentor-interviews-public", async (req, res) => {
           email: mentor.email,
           firstName: mentor.first_name,
           lastName: mentor.last_name,
-          mentorApproved: mentor.mentor_approved
+          mentorApproved: mentor.mentor_approved,
+          applicationStatus: application ? application.status : null
         }
       });
     }
@@ -116,7 +118,8 @@ router.get("/mentor-interviews", authenticateToken, isAdmin, async (req, res) =>
           email: mentor.email,
           firstName: mentor.first_name,
           lastName: mentor.last_name,
-          mentorApproved: mentor.mentor_approved
+          mentorApproved: mentor.mentor_approved,
+          applicationStatus: application ? application.status : null
         }
       });
     }
@@ -173,6 +176,78 @@ router.post("/mentor-approve/:mentorId", authenticateToken, isAdmin, async (req,
         }
       }
     );
+    
+    // Transfer skills from application to user_skills collection
+    const mentorApplication = await mentorApplicationsCollection.findOne({ user_id: new ObjectId(mentorId) });
+    if (mentorApplication && mentorApplication.skills) {
+      // Get skills collection
+      const skillsCollection = db.collection('skills');
+      const userSkillsCollection = db.collection('user_skills');
+      
+      // Parse skills from application (handle both comma-separated and free text)
+      let skillList = [];
+      
+      // First try to split by commas
+      if (mentorApplication.skills.includes(',')) {
+        skillList = mentorApplication.skills.split(',').map(skill => skill.trim()).filter(skill => skill);
+      } else {
+        // If no commas, try to split by common separators or treat as single skill
+        // Try splitting by common separators
+        const separators = [',', ';', '\n', '\r'];
+        let skillsText = mentorApplication.skills;
+        
+        // Replace all separators with commas
+        for (const separator of separators) {
+          skillsText = skillsText.replace(new RegExp(separator, 'g'), ',');
+        }
+        
+        // Split by comma and clean up
+        skillList = skillsText.split(',').map(skill => skill.trim()).filter(skill => skill);
+        
+        // If still no skills or too many from single line, treat as single skill
+        if (skillList.length === 0 || (skillList.length > 10 && !mentorApplication.skills.includes(','))) {
+          skillList = [mentorApplication.skills.trim()];
+        }
+      }
+      
+      // For each skill, either find existing skill or create new one
+      for (const skillName of skillList) {
+        // Skip if skill name is too short
+        if (skillName.length < 2) continue;
+        
+        // Try to find existing skill (case insensitive)
+        let skill = await skillsCollection.findOne({ 
+          name: { $regex: new RegExp(`^${skillName}$`, 'i') } 
+        });
+        
+        // If skill doesn't exist, create it
+        if (!skill) {
+          const skillResult = await skillsCollection.insertOne({
+            name: skillName,
+            category: 'Other',
+            created_at: new Date(),
+            updated_at: new Date()
+          });
+          skill = { _id: skillResult.insertedId, name: skillName };
+        }
+        
+        // Add skill to user_skills collection
+        await userSkillsCollection.updateOne(
+          { user_id: new ObjectId(mentorId), skill_id: skill._id, skill_type: 'offered' },
+          { 
+            $set: { 
+              user_id: new ObjectId(mentorId),
+              skill_id: skill._id,
+              skill_type: 'offered',
+              proficiency_level: 3, // Default proficiency level
+              description: '',
+              updated_at: new Date()
+            }
+          },
+          { upsert: true }
+        );
+      }
+    }
 
     // Get the updated user
     const user = await usersCollection.findOne({ _id: new ObjectId(mentorId) });
@@ -577,19 +652,7 @@ router.get("/validate-interview-code/:code", async (req, res) => {
     // Get database connection
     const db = await connectDB();
     
-    // Check if we're using a mock database
-    if (!db || typeof db.collection !== 'function') {
-      // Return mock data for development
-      console.log("Using mock database - returning mock interview data");
-      return res.json({
-        success: true,
-        meetingLink: `http://localhost:5173/interview/session/${code}`,
-        interviewCode: code,
-        scheduledAt: new Date(Date.now() + 3600000), // 1 hour from now
-        durationMinutes: 30
-      });
-    }
-    
+    // Remove mock database check - always use real database
     const interviewSessionsCollection = db.collection('interview_sessions');
 
     // Find interview session with the provided code

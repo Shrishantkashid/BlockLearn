@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllSkills, getMatchingMentors } from '../api';
+import { getAllSkills, getMatchingMentors, searchMentors } from '../api';
 import MatchingSystem from '../components/MatchingSystem';
 
 function Match() {
   const [skills, setSkills] = useState([]);
   const [selectedSkill, setSelectedSkill] = useState('');
+  const [searchName, setSearchName] = useState('');
+  const [searchCampus, setSearchCampus] = useState('');
+  const [minMatchScore, setMinMatchScore] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
 
   useEffect(() => {
     fetchSkills();
@@ -30,8 +34,8 @@ function Match() {
   };
 
   const handleSearch = () => {
-    if (!selectedSkill) {
-      setError('Please select a skill');
+    if (!selectedSkill && !searchName && !searchCampus) {
+      setError('Please select a skill or enter search criteria');
       return;
     }
     setError('');
@@ -77,9 +81,18 @@ function Match() {
 
         {/* Search Section */}
         <div className="card mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">Find Mentors by Skill</h2>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Find Mentors</h2>
+            <button 
+              className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+              onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+            >
+              {showAdvancedOptions ? 'Hide Advanced Options' : 'Show Advanced Options'}
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Select a Skill</label>
               <select 
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -94,15 +107,70 @@ function Match() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end">
-              <button 
-                className="btn-primary w-full sm:w-auto"
-                onClick={handleSearch}
-              >
-                Find Mentors
-              </button>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Mentor Name</label>
+              <input
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Search by name..."
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+              />
             </div>
           </div>
+          
+          {showAdvancedOptions && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Campus</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Search by campus..."
+                  value={searchCampus}
+                  onChange={(e) => setSearchCampus(e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Minimum Match Score</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="0-100%"
+                  value={minMatchScore}
+                  onChange={(e) => setMinMatchScore(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button 
+              className="btn-primary w-full sm:w-auto"
+              onClick={handleSearch}
+              disabled={loading}
+            >
+              {loading ? 'Searching...' : 'Find Mentors'}
+            </button>
+            
+            <button 
+              className="btn-secondary w-full sm:w-auto"
+              onClick={() => {
+                setSelectedSkill('');
+                setSearchName('');
+                setSearchCampus('');
+                setMinMatchScore('');
+                setError('');
+              }}
+            >
+              Clear Filters
+            </button>
+          </div>
+          
           {error && (
             <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg">
               {error}
@@ -111,9 +179,16 @@ function Match() {
         </div>
 
         {/* Matching System */}
-        {selectedSkill && (
+        {(selectedSkill || searchName || searchCampus) && (
           <div className="mt-8">
-            <MatchingSystem skillId={selectedSkill} />
+            <MatchingSystem 
+              skillId={selectedSkill} 
+              searchFilters={{
+                name: searchName,
+                campus: searchCampus,
+                minMatchScore: minMatchScore
+              }}
+            />
           </div>
         )}
 

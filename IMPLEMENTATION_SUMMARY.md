@@ -280,3 +280,138 @@ Your BlockLearn platform now has:
 - 🧠 **Data collection ready** for AI enhancement
 
 **Your website looks absolutely beautiful and is now much more intelligent! 🌟**
+
+# Mentor Profile Details and Connection Implementation
+
+## Overview
+This implementation adds functionality for learners to view detailed mentor profiles and send connection requests. Mentors can then review and accept/reject these requests.
+
+## Changes Made
+
+### 1. Backend Implementation
+
+#### New Mentor Routes (`backend/routes/mentor.js`)
+- **POST /api/mentor/connect** - Send a connection request to a mentor
+- **GET /api/mentor/connections** - Get all connection requests for a mentor
+- **POST /api/mentor/accept/:connectionId** - Accept a connection request
+- **POST /api/mentor/reject/:connectionId** - Reject a connection request
+
+#### Database Changes (`backend/utils/databaseMigration.js`)
+- Added `mentor_connections` collection
+- Created indexes for efficient querying:
+  - learner_id
+  - mentor_id
+  - status
+  - created_at
+  - Compound index on learner_id, mentor_id, and status
+
+#### Route Registration (`backend/server-vercel.js`)
+- Added mentor routes to the Express app
+
+### 2. Frontend Implementation
+
+#### New Components
+
+##### MentorProfileView (`frontend/src/pages/MentorProfileView.jsx`)
+- Displays detailed mentor profile information
+- Shows mentor's bio, skills, experience, and availability
+- Includes a "Connect with Mentor" button that sends a connection request
+- Handles success/error feedback for connection requests
+
+##### Updated Components
+
+##### MatchingSystem (`frontend/src/components/MatchingSystem.jsx`)
+- Modified "View Details" button to navigate to mentor profile view
+- Added React Router navigation functionality
+
+##### MentorDashboard (`frontend/src/pages/MentorDashboard.jsx`)
+- Added Connection Requests section to show pending learner requests
+- Implemented Accept/Reject functionality for connection requests
+- Added refresh button to update connection requests
+
+#### API Functions (`frontend/src/api.js`)
+- Added new API functions for mentor connections:
+  - `connectWithMentor(mentorId)`
+  - `getMentorConnections()`
+  - `acceptMentorConnection(connectionId)`
+  - `rejectMentorConnection(connectionId)`
+
+#### Routing (`frontend/src/App.jsx`)
+- Added route for mentor profile view: `/mentor/profile/:mentorId`
+
+## How It Works
+
+1. **Learner Side:**
+   - Learner views recommended mentors in the MatchingSystem
+   - Clicks "View Details" to see mentor profile
+   - Reviews mentor details and clicks "Connect with Mentor"
+   - Receives confirmation that request was sent
+
+2. **Mentor Side:**
+   - Mentor logs into dashboard and sees Connection Requests section
+   - Views pending requests from learners
+   - Can Accept or Reject each request
+   - Connection status is updated in the database
+
+## Data Flow
+
+1. **Connection Request:**
+   - Learner → MentorProfileView → connectWithMentor() → POST /api/mentor/connect
+   - Backend validates mentor/learner and creates connection record
+   - Response sent back to frontend
+
+2. **View Requests:**
+   - Mentor → MentorDashboard → getMentorConnections() → GET /api/mentor/connections
+   - Backend fetches all mentor's connection requests with learner details
+   - Response sent back to frontend
+
+3. **Accept/Reject:**
+   - Mentor → MentorDashboard → acceptMentorConnection()/rejectMentorConnection() → POST /api/mentor/accept/:id or POST /api/mentor/reject/:id
+   - Backend updates connection status
+   - Response sent back to frontend
+
+## Database Schema
+
+### mentor_connections Collection
+```javascript
+{
+  _id: ObjectId,
+  learner_id: ObjectId,    // Reference to learner user
+  mentor_id: ObjectId,     // Reference to mentor user
+  status: String,          // 'pending', 'accepted', or 'rejected'
+  created_at: Date,
+  updated_at: Date
+}
+```
+
+## Security Considerations
+
+- All endpoints use authentication middleware
+- Only mentors can view their connection requests
+- Only mentors can accept/reject requests
+- Only learners can send connection requests
+- Duplicate requests are prevented
+- Proper validation of user types
+
+## Future Enhancements
+
+1. **Notifications System:**
+   - Email notifications when requests are accepted/rejected
+   - In-app notifications for mentors and learners
+
+2. **Enhanced Profile Information:**
+   - Add mentor ratings and reviews
+   - Include mentor availability calendar
+   - Show mentor's teaching experience
+
+3. **Messaging System:**
+   - Allow mentors and learners to communicate after connection
+   - Add real-time chat functionality
+
+4. **Advanced Filtering:**
+   - Filter mentors by skills, availability, ratings
+   - Search functionality for mentors
+
+5. **Connection Status Tracking:**
+   - Show connection history
+   - Track accepted/rejected requests over time

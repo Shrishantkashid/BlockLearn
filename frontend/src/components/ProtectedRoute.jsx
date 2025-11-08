@@ -14,11 +14,38 @@ const ProtectedRoute = ({ children }) => {
       return <Navigate to="/prelogin" state={{ from: location }} replace />;
     }
     
+    // Try to parse userData to verify it's valid JSON
+    let parsedUser;
+    try {
+      parsedUser = JSON.parse(userData);
+    } catch (parseError) {
+      console.error("Invalid userData in localStorage:", userData);
+      // Clear invalid data and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      const location = useLocation();
+      return <Navigate to="/prelogin" state={{ from: location }} replace />;
+    }
+    
+    // Validate user data structure
+    if (!parsedUser.id || !parsedUser.email) {
+      console.error("Invalid user data structure:", parsedUser);
+      // Clear invalid data and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      const location = useLocation();
+      return <Navigate to="/prelogin" state={{ from: location }} replace />;
+    }
+    
     return children;
   } catch (error) {
     console.error("Error in ProtectedRoute:", error);
+    // Clear potentially corrupted auth data
+    localStorage.removeItem('token');
+    localStorage.removeItem('userData');
     // Redirect to pre-login page if there's an error
-    return <Navigate to="/prelogin" replace />;
+    const location = useLocation();
+    return <Navigate to="/prelogin" state={{ from: location }} replace />;
   }
 };
 

@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import api from "../api"; // Use the api service instead of axios directly
-import { BookOpen, Users, Calendar, Award, Settings, LogOut, User, Clock } from "lucide-react";
+import api from "../api";
+import { getMentorConnections, acceptMentorConnection, rejectMentorConnection } from "../api";
+import { BookOpen, Users, Calendar, Award, Settings, LogOut, User, Clock, MessageSquare } from "lucide-react";
 
 function MentorDashboard() {
   const [user, setUser] = useState(null);
   const [interview, setInterview] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [connectionRequests, setConnectionRequests] = useState([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -32,6 +37,13 @@ function MentorDashboard() {
     // Fetch current user data from backend to ensure we have the latest status
     fetchCurrentUser(token);
   }, [navigate]);
+
+  useEffect(() => {
+    if (user && user.mentorApproved === true) {
+      fetchConnectionRequests();
+      fetchSessions();
+    }
+  }, [user]);
 
   const fetchCurrentUser = async (token) => {
     try {
@@ -106,6 +118,96 @@ function MentorDashboard() {
       console.error("Error fetching interview details:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchConnectionRequests = async () => {
+    try {
+      setConnectionsLoading(true);
+      const response = await getMentorConnections();
+      if (response.success) {
+        setConnectionRequests(response.data);
+      } else {
+        // Handle API error response
+        console.error("API Error:", response.message);
+        // Show error to user
+        // Optionally show an error message to the user
+      }
+    } catch (error) {
+      console.error("Error fetching connection requests:", error);
+      // Check if it's an authentication error
+      if (error.response && error.response.status === 401) {
+        // Token might be expired, clear local storage and redirect to login
+        localStorage.removeItem('token');
+        localStorage.removeItem('userData');
+        navigate('/prelogin');
+      } else if (error.response && error.response.status === 403) {
+        // User is not authorized (might not be a mentor)
+        console.error("User not authorized to view connections");
+      }
+      // Optionally show an error message to the user
+    } finally {
+      setConnectionsLoading(false);
+    }
+  };
+
+  const fetchSessions = async () => {
+    try {
+      setSessionsLoading(true);
+      const response = await api.get("/api/sessions");
+      if (response.data.success) {
+        // Filter sessions where user is the mentor
+        const mentorSessions = response.data.data.filter(session => 
+          session.mentor.id === user.id
+        );
+        setSessions(mentorSessions);
+      }
+    } catch (error) {
+      console.error("Error fetching sessions:", error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const handleAcceptRequest = async (connectionId) => {
+    try {
+      const response = await acceptMentorConnection(connectionId);
+      if (response.success) {
+        // Refresh the connection requests
+        fetchConnectionRequests();
+      }
+    } catch (error) {
+      console.error("Error accepting connection request:", error);
+    }
+  };
+
+  const handleRejectRequest = async (connectionId) => {
+    try {
+      const response = await rejectMentorConnection(connectionId);
+      if (response.success) {
+        // Refresh the connection requests
+        fetchConnectionRequests();
+      }
+    } catch (error) {
+      console.error("Error rejecting connection request:", error);
+    }
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getSessionStatusColor = (status) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -285,6 +387,145 @@ function MentorDashboard() {
           </div>
         ) : null}
 
+        {/* Connection Requests */}
+        {user.mentorApproved === true && (
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
+                Connection Requests
+              </h2>
+              <button 
+                onClick={fetchConnectionRequests}
+                className="text-sm text-primary hover:text-primary/80"
+              >
+                Refresh
+              </button>
+            </div>
+            
+            {connectionsLoading ? (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary mb-2"></div>
+                <p className="text-gray-600 dark:text-slate-400">Loading connection requests...</p>
+              </div>
+            ) : connectionRequests.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                <MessageSquare className="w-12 h-12 text-gray-300 dark:text-slate-600 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-slate-400">
+                  No connection requests at this time.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {connectionRequests
+                  .filter(request => request.status === 'pending')
+                  .map((request) => (
+                    <div key={request.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-slate-700 rounded-lg">
+                      <div>
+                        <h3 className="font-medium text-gray-900 dark:text-slate-100">
+                          {request.learner.first_name} {request.learner.last_name}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-slate-400">
+                          {request.learner.email}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                          Requested on {new Date(request.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button 
+                          onClick={() => handleAcceptRequest(request.id)}
+                          className="px-3 py-1 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 transition-colors"
+                        >
+                          Accept
+                        </button>
+                        <button 
+                          onClick={() => handleRejectRequest(request.id)}
+                          className="px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                }
+                
+                {connectionRequests.filter(request => request.status === 'pending').length === 0 && (
+                  <div className="text-center py-4">
+                    <p className="text-gray-600 dark:text-slate-400">
+                      No pending connection requests.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Upcoming Sessions */}
+        {user.mentorApproved === true && (
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
+                Upcoming Sessions
+              </h2>
+              <button 
+                onClick={fetchSessions}
+                className="text-sm text-primary hover:text-primary/80"
+              >
+                Refresh
+              </button>
+            </div>
+            
+            {sessionsLoading ? (
+              <div className="text-center py-4">
+                <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary mb-2"></div>
+                <p className="text-gray-600 dark:text-slate-400">Loading sessions...</p>
+              </div>
+            ) : sessions.filter(session => session.status === 'scheduled').length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                <Calendar className="w-12 h-12 text-gray-300 dark:text-slate-600 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-slate-400">
+                  No upcoming sessions scheduled.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sessions
+                  .filter(session => session.status === 'scheduled')
+                  .map((session) => (
+                    <div key={session.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-slate-700 rounded-lg">
+                      <div>
+                        <h3 className="font-medium text-gray-900 dark:text-slate-100">
+                          {session.skill.name} with {session.student.first_name} {session.student.last_name}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-slate-400">
+                          {formatDate(session.scheduled_at)}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                          Duration: {session.duration_minutes} minutes
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 text-xs rounded-full ${getSessionStatusColor(session.status)}`}>
+                          {session.status}
+                        </span>
+                        {session.meeting_link && (
+                          <Link 
+                            to={session.meeting_link}
+                            className="px-3 py-1 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors"
+                          >
+                            Join Session
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Quick Actions (only show if mentor is approved) */}
         {user.mentorApproved === true && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -321,7 +562,9 @@ function MentorDashboard() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Students Mentored</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">0</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                    {sessions.filter(s => s.status === 'completed').length}
+                  </p>
                 </div>
               </div>
             </div>
@@ -333,7 +576,10 @@ function MentorDashboard() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Hours Contributed</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">0</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                    {Math.floor(sessions.reduce((total, session) => 
+                      session.status === 'completed' ? total + session.duration_minutes : total, 0) / 60)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -345,7 +591,9 @@ function MentorDashboard() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Sessions Completed</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">0</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                    {sessions.filter(s => s.status === 'completed').length}
+                  </p>
                 </div>
               </div>
             </div>
@@ -357,7 +605,9 @@ function MentorDashboard() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Upcoming Sessions</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">0</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                    {sessions.filter(s => s.status === 'scheduled').length}
+                  </p>
                 </div>
               </div>
             </div>

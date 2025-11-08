@@ -820,19 +820,6 @@ router.get("/validate-interview-code/:code", async (req, res) => {
     // Get database connection
     const db = await connectDB();
     
-    // Check if we're using a mock database
-    if (!db || typeof db.collection !== 'function') {
-      // Return mock data for development
-      console.log("Using mock database - returning mock interview data");
-      return res.json({
-        success: true,
-        meetingLink: `http://localhost:5173/mentor/interview/${code}`,
-        interviewCode: code,
-        scheduledAt: new Date(Date.now() + 3600000), // 1 hour from now
-        durationMinutes: 30
-      });
-    }
-    
     const interviewSessionsCollection = db.collection('interview_sessions');
 
     // Find interview session with the provided code

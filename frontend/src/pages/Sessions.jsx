@@ -1,20 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  Award, 
-  MessageSquare,
-  ArrowLeft,
-  CheckCircle,
-  Video,
-  Copy,
-  Check
-} from 'lucide-react';
-import api from '../api';
-import LiveSessionModal from '../components/LiveSessionModal';
-import LiveSessionCode from '../components/LiveSessionCode';
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { Calendar, Clock, Video, CheckCircle, AlertCircle, Send, User } from "lucide-react";
+import api from "../api";
+import FeedbackModal from "../components/FeedbackModal";
+import LiveSessionModal from "../components/LiveSessionModal";
+import LiveSessionCode from "../components/LiveSessionCode";
+import SessionSchedulingChat from "../components/SessionSchedulingChat";
 
 const Sessions = () => {
   const [sessions, setSessions] = useState({
@@ -33,9 +24,19 @@ const Sessions = () => {
     session: null
   });
   const [generatedLiveSession, setGeneratedLiveSession] = useState(null);
+  const [showSchedulingChat, setShowSchedulingChat] = useState(false);
+  const [selectedMentor, setSelectedMentor] = useState(null);
+  const [selectedSkill, setSelectedSkill] = useState(null);
+  const [preSelectedMentor, setPreSelectedMentor] = useState(null);
+  const [preSelectedSkill, setPreSelectedSkill] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchUserSessions();
+    
+    // Check if there's a pre-selected mentor from navigation state
+    // In a real implementation, this would come from navigation state
+    // For now, we'll just show the scheduling section by default if there are no sessions
   }, []);
 
   const fetchUserSessions = async () => {
@@ -53,57 +54,11 @@ const Sessions = () => {
       }
     } catch (error) {
       console.error('Error fetching sessions:', error);
-      // Fallback to mock data if API fails
-      setTimeout(() => {
-        setSessions({
-          upcoming: [
-            {
-              id: 1,
-              title: 'JavaScript Fundamentals',
-              mentor: { first_name: 'Alex', last_name: 'Johnson' },
-              time: 'Tomorrow, 2:00 PM',
-              duration: '1 hour',
-              location: 'Online',
-              status: 'scheduled',
-              skill: { name: 'JavaScript' }
-            },
-            {
-              id: 2,
-              title: 'UI/UX Design Basics',
-              mentor: { first_name: 'Sarah', last_name: 'Chen' },
-              time: 'Friday, 4:00 PM',
-              duration: '1.5 hours',
-              location: 'Library Room 201',
-              status: 'scheduled',
-              skill: { name: 'UI/UX Design' }
-            }
-          ],
-          completed: [
-            {
-              id: 3,
-              title: 'React Advanced Concepts',
-              mentor: { first_name: 'Mike', last_name: 'Rodriguez' },
-              time: 'Yesterday, 3:00 PM',
-              duration: '2 hours',
-              location: 'Online',
-              status: 'completed',
-              hasFeedback: false,
-              skill: { name: 'React' }
-            },
-            {
-              id: 4,
-              title: 'Node.js Backend Development',
-              mentor: { first_name: 'Emma', last_name: 'Wilson' },
-              time: 'Last week, 1:00 PM',
-              duration: '1.5 hours',
-              location: 'Online',
-              status: 'completed',
-              hasFeedback: true,
-              skill: { name: 'Node.js' }
-            }
-          ]
-        });
-      }, 1000);
+      // Don't use mock data - show error instead
+      setSessions({
+        upcoming: [],
+        completed: []
+      });
     } finally {
       setLoading(false);
     }
@@ -196,6 +151,22 @@ const Sessions = () => {
     navigate(`/session/live/${code}`);
   };
 
+  const handleScheduleWithMentor = (mentor, skill) => {
+    setSelectedMentor(mentor);
+    setSelectedSkill(skill);
+    setShowSchedulingChat(true);
+  };
+
+  const handleSessionScheduled = (sessionData) => {
+    // Refresh sessions list
+    fetchUserSessions();
+    // Close chat
+    setShowSchedulingChat(false);
+    // Reset selection
+    setSelectedMentor(null);
+    setSelectedSkill(null);
+  };
+
   const renderSessionCard = (session) => (
     <div key={session.id} className="card">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -241,16 +212,15 @@ const Sessions = () => {
               )}
             </>
           ) : (
-            <div className="flex space-x-2">
+            <>
               <button
                 onClick={() => openLiveSessionModal(session)}
-                className="flex items-center px-3 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+                className="btn-primary flex items-center"
               >
-                <Video className="w-4 h-4 mr-1" />
+                <Video className="w-4 h-4 mr-2" />
                 Start Live Session
               </button>
-              <button className="btn-primary">Join Session</button>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -259,211 +229,144 @@ const Sessions = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      {/* Navigation */}
-      <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <h1 className="text-2xl font-bold gradient-text">BlockLearn</h1>
-              </div>
-            </div>
-            <div className="flex items-center space-x-6">
-              <Link to="/dashboard" className="text-gray-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors">
-                Dashboard
-              </Link>
-              <Link to="/skills" className="text-gray-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors">
-                Skills
-              </Link>
-              <Link to="/match" className="text-gray-600 dark:text-slate-300 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors">
-                Match
-              </Link>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center mb-8">
-          <Link to="/dashboard" className="flex items-center text-gray-600 dark:text-slate-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-            <ArrowLeft className="w-5 h-5 mr-2" />
-            <span>Back to Dashboard</span>
-          </Link>
-        </div>
-
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-2">My Sessions</h1>
-          <p className="text-gray-600 dark:text-slate-400">Manage your upcoming and completed learning sessions</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">My Sessions</h1>
+          <p className="text-gray-600 dark:text-slate-400">
+            Manage your upcoming and completed learning sessions
+          </p>
         </div>
 
-        {/* Generated Live Session Code */}
+        {showSchedulingChat && selectedMentor && selectedSkill && (
+          <div className="mb-8">
+            <SessionSchedulingChat
+              mentor={selectedMentor}
+              student={{}} // Will be filled from auth context
+              skill={selectedSkill}
+              onSessionScheduled={handleSessionScheduled}
+            />
+          </div>
+        )}
+
         {generatedLiveSession && (
           <div className="mb-8">
             <LiveSessionCode 
-              liveSessionData={generatedLiveSession}
+              liveSessionData={generatedLiveSession} 
               onJoinSession={handleJoinLiveSession}
             />
           </div>
         )}
 
-        {/* Upcoming Sessions */}
-        <section className="mb-12">
-          <div className="flex items-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100 flex items-center">
-              <Calendar className="w-6 h-6 mr-2 text-primary" />
-              Upcoming Sessions
-            </h2>
-            <span className="ml-3 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
-              {sessions.upcoming.length}
-            </span>
-          </div>
-          
-          {sessions.upcoming.length > 0 ? (
-            <div className="space-y-4">
-              {sessions.upcoming.map(renderSessionCard)}
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center border border-gray-200 dark:border-slate-700">
-              <Calendar className="w-12 h-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-2">No Upcoming Sessions</h3>
-              <p className="text-gray-500 dark:text-slate-400 mb-4">You don't have any scheduled sessions yet.</p>
-              <Link to="/match" className="btn-primary">
-                Find a Mentor
-              </Link>
+        <div className="space-y-8">
+          {/* Schedule New Session - Only show when not in chat mode */}
+          {!showSchedulingChat && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-blue-500" />
+                  Schedule New Session
+                </h2>
+              </div>
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+                <p className="text-gray-600 dark:text-slate-400 mb-4">
+                  You can schedule sessions with mentors who have accepted your connection requests.
+                  Please check your mentor connection status in your dashboard to see which mentors
+                  have accepted your requests.
+                </p>
+                <Link
+                  to="/learner/dashboard"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none"
+                >
+                  Check Mentor Connections
+                </Link>
+              </div>
             </div>
           )}
-        </section>
 
-        {/* Completed Sessions */}
-        <section>
-          <div className="flex items-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-900 dark:text-slate-100 flex items-center">
-              <CheckCircle className="w-6 h-6 mr-2 text-primary" />
-              Completed Sessions
-            </h2>
-            <span className="ml-3 px-2 py-1 bg-primary/10 text-primary text-xs rounded-full">
-              {sessions.completed.length}
-            </span>
+          {/* Upcoming Sessions */}
+          <div>
+            <div className="flex items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                <Calendar className="w-5 h-5 mr-2 text-blue-500" />
+                Upcoming Sessions
+              </h2>
+              <span className="ml-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                {sessions.upcoming.length}
+              </span>
+            </div>
+            
+            {sessions.upcoming.length > 0 ? (
+              <div className="space-y-4">
+                {sessions.upcoming.map(renderSessionCard)}
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-8 text-center">
+                <Calendar className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No upcoming sessions</h3>
+                <p className="text-gray-500 dark:text-slate-400">
+                  You don't have any scheduled sessions yet.
+                </p>
+              </div>
+            )}
           </div>
-          
-          {sessions.completed.length > 0 ? (
-            <div className="space-y-4">
-              {sessions.completed.map(renderSessionCard)}
+
+          {/* Completed Sessions */}
+          <div>
+            <div className="flex items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                <CheckCircle className="w-5 h-5 mr-2 text-green-500" />
+                Completed Sessions
+              </h2>
+              <span className="ml-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                {sessions.completed.length}
+              </span>
             </div>
-          ) : (
-            <div className="bg-white dark:bg-slate-800 rounded-lg p-8 text-center border border-gray-200 dark:border-slate-700">
-              <CheckCircle className="w-12 h-12 text-gray-400 dark:text-slate-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-2">No Completed Sessions</h3>
-              <p className="text-gray-500 dark:text-slate-400 mb-4">You haven't completed any sessions yet.</p>
-              <Link to="/match" className="btn-primary">
-                Find a Mentor
-              </Link>
-            </div>
-          )}
-        </section>
-      </main>
+            
+            {sessions.completed.length > 0 ? (
+              <div className="space-y-4">
+                {sessions.completed.map(renderSessionCard)}
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-8 text-center">
+                <CheckCircle className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No completed sessions</h3>
+                <p className="text-gray-500 dark:text-slate-400">
+                  Your completed sessions will appear here.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Feedback Modal */}
+      {feedbackModal.isOpen && (
+        <FeedbackModal
+          isOpen={feedbackModal.isOpen}
+          onClose={closeFeedbackModal}
+          sessionId={feedbackModal.sessionId}
+          userRole={feedbackModal.userRole}
+          existingFeedback={feedbackModal.existingFeedback}
+          onSubmit={handleFeedbackSubmit}
+        />
+      )}
 
       {/* Live Session Modal */}
       {liveSessionModal.isOpen && (
         <LiveSessionModal
-          session={liveSessionModal.session}
+          isOpen={liveSessionModal.isOpen}
           onClose={closeLiveSessionModal}
+          session={liveSessionModal.session}
           onCodeGenerated={handleLiveSessionCodeGenerated}
         />
-      )}
-
-      {/* Feedback Modal */}
-      {feedbackModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">Session Feedback</h3>
-            <p className="text-gray-600 dark:text-slate-400 mb-6">How was your session? Your feedback helps us improve.</p>
-            
-            <div className="feedback mb-6">
-              <label className="angry">
-                <input type="radio" name="feedback" />
-                <div>
-                  <svg className="eye" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                  <svg className="eye right" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                  <svg className="mouth" viewBox="0 0 18 7">
-                    <path d="M1,5.5 C1.83333333,7.16666667 3.16666667,8 5,8 C6.83333333,8 8.16666667,7.16666667 9,5.5 C9.83333333,7.16666667 11.1666667,8 13,8 C14.8333333,8 16.1666667,7.16666667 17,5.5" />
-                  </svg>
-                </div>
-              </label>
-              <label className="sad">
-                <input type="radio" name="feedback" />
-                <div>
-                  <svg className="eye" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                  <svg className="eye right" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                  <svg className="mouth" viewBox="0 0 18 7">
-                    <path d="M1,1 C1.83333333,2.16666667 3.16666667,2.75 5,2.75 C6.83333333,2.75 8.16666667,2.16666667 9,1 C9.83333333,2.16666667 11.1666667,2.75 13,2.75 C14.8333333,2.75 16.1666667,2.16666667 17,1" />
-                  </svg>
-                </div>
-              </label>
-              <label className="ok">
-                <input type="radio" name="feedback" />
-                <div></div>
-              </label>
-              <label className="good">
-                <input type="radio" name="feedback" />
-                <div>
-                  <svg className="eye" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                  <svg className="eye right" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                  <svg className="mouth" viewBox="0 0 18 7">
-                    <path d="M1,5.5 C1.83333333,4.33333333 3.16666667,3.75 5,3.75 C6.83333333,3.75 8.16666667,4.33333333 9,5.5" />
-                  </svg>
-                </div>
-              </label>
-              <label className="happy">
-                <input type="radio" name="feedback" />
-                <div>
-                  <svg className="eye" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                  <svg className="eye right" viewBox="0 0 7 4">
-                    <path d="M1,1 C1.83333333,2.16666667 2.66666667,2.75 3.5,2.75 C4.33333333,2.75 5.16666667,2.16666667 6,1" />
-                  </svg>
-                </div>
-              </label>
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={closeFeedbackModal}
-                className="px-4 py-2 text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={closeFeedbackModal}
-                className="btn-primary"
-              >
-                Submit Feedback
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );

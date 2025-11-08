@@ -19,14 +19,35 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle response errors
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Handle authentication errors
+    if (error.response && error.response.status === 401) {
+      // Clear local storage and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('userData');
+      // Optionally redirect to pre-login page
+      // window.location.href = '/prelogin';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Generic API request
 export async function apiRequest(endpoint, method = 'GET', data = null) {
-  const response = await api.request({
-    url: endpoint,
-    method,
-    data,
-  });
-  return response.data;
+  try {
+    const response = await api.request({
+      url: endpoint,
+      method,
+      data,
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`API request error for ${endpoint}:`, error);
+    throw error;
+  }
 }
 
 // Send OTP to email
@@ -87,6 +108,12 @@ export async function getMatchingMentors(skillId) {
   return response.data;
 }
 
+export async function searchMentors(filters) {
+  const queryParams = new URLSearchParams(filters).toString();
+  const response = await api.get(`/api/matching/mentors-advanced?${queryParams}`);
+  return response.data;
+}
+
 export async function getMatchDetail(mentorId, skillId) {
   const response = await api.get(`/api/matching/match-detail/${mentorId}/${skillId}`);
   return response.data;
@@ -141,6 +168,32 @@ export async function generateLiveSessionCode(sessionId) {
 
 export async function validateLiveSessionCode(code) {
   const response = await api.get(`/api/sessions/validate-live-code/${code}`);
+  return response.data;
+}
+
+// Mentor connection API endpoints
+export async function connectWithMentor(mentorId) {
+  const response = await api.post('/api/mentor/connect', { mentorId });
+  return response.data;
+}
+
+export async function getMentorConnections() {
+  const response = await api.get('/api/mentor/connections');
+  return response.data;
+}
+
+export async function acceptMentorConnection(connectionId) {
+  const response = await api.post(`/api/mentor/accept/${connectionId}`);
+  return response.data;
+}
+
+export async function rejectMentorConnection(connectionId) {
+  const response = await api.post(`/api/mentor/reject/${connectionId}`);
+  return response.data;
+}
+
+export async function getLearnerConnections() {
+  const response = await api.get('/api/mentor/learner-connections');
   return response.data;
 }
 

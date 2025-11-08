@@ -106,9 +106,19 @@ function AdminDashboard() {
   };
 
   // Filter mentors based on their status
-  const pendingApprovalMentors = mentors.filter(mentor => mentor.user?.mentorApproved !== true && mentor.user?.mentorApproved !== false);
+  // We now use applicationStatus to distinguish between pending and rejected mentors
+  // true means approved, 'rejected' applicationStatus means rejected, 'pending' or null/undefined means pending approval
+  const pendingApprovalMentors = mentors.filter(mentor => 
+    mentor.user?.mentorApproved !== true && 
+    (!mentor.user?.applicationStatus || mentor.user?.applicationStatus === 'pending')
+  );
   const approvedMentors = mentors.filter(mentor => mentor.user?.mentorApproved === true);
-  const rejectedMentors = mentors.filter(mentor => mentor.user?.mentorApproved === false);
+  const rejectedMentors = mentors.filter(mentor => 
+    mentor.user?.mentorApproved === false && 
+    mentor.user?.applicationStatus === 'rejected'
+  );
+  
+  // Note: We now properly distinguish between pending and rejected mentors using applicationStatus
 
   if (loading) {
     return (

@@ -39,18 +39,8 @@ async function connectDB() {
       process.exit(1);
     }
     
-    // Return a mock database object for development
-    console.warn('⚠️  Running in offline mode - database operations will not work');
-    return {
-      collection: (name) => ({
-        find: () => ({ toArray: async () => [] }),
-        findOne: async () => null,
-        insertOne: async () => ({ insertedId: 'mock-id' }),
-        updateOne: async () => ({ matchedCount: 0, modifiedCount: 0 }),
-        deleteOne: async () => ({ deletedCount: 0 }),
-        countDocuments: async () => 0
-      })
-    };
+    // For development, throw the error to make it clear that MongoDB is required
+    throw new Error('MongoDB connection failed. Please check your configuration.');
   }
 }
 

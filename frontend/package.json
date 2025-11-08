@@ -16,6 +16,7 @@
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
     "axios": "^1.12.2",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "ethers": "^5.7.0",
@@ -32,6 +33,7 @@
     "socket.io-client": "^4.8.1",
     "tailwind-merge": "^3.3.1",
     "three": "^0.180.0",
+    "vite-plugin-node-polyfills": "^0.24.0",
     "web3": "^1.10.0"
   },
   "devDependencies": {

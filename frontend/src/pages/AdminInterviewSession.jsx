@@ -10,9 +10,12 @@ import {
   PhoneOff, 
   User, 
   Calendar,
-  MessageSquare,
   Clock,
-  Users
+  Users,
+  CheckCircle,
+  AlertCircle,
+  Send,
+  MessageCircle
 } from "lucide-react";
 
 export default function AdminInterviewSession() {
@@ -24,6 +27,8 @@ export default function AdminInterviewSession() {
   const remoteVideoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const socketRef = useRef(null);
+  const isInitializingRef = useRef(false); // Add this ref
+  const messagesEndRef = useRef(null);
   
   // State
   const [localStream, setLocalStream] = useState(null);
@@ -36,6 +41,12 @@ export default function AdminInterviewSession() {
   const [isCalling, setIsCalling] = useState(false);
   const [caller, setCaller] = useState(null);
   const [callAccepted, setCallAccepted] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [otherParticipant, setOtherParticipant] = useState({ name: 'Mentor', hasVideo: false });
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [showChat, setShowChat] = useState(false);
   
   // WebRTC configuration
   const configuration = {
@@ -46,24 +57,55 @@ export default function AdminInterviewSession() {
     ]
   };
 
+  // Show notification popup
+  const showNotificationPopup = (message) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 3000);
+  };
+
+  // Add a ref to track if the component has been mounted
+  const isComponentMountedRef = useRef(false);
+  // Add a ref to track if we've already created an offer for a user
+  const offerCreatedRef = useRef(new Set());
+
   // Initialize socket connection and media
   useEffect(() => {
+    // Prevent double mounting in development mode
+    if (isComponentMountedRef.current) {
+      console.log('Component already mounted, skipping initialization');
+      return;
+    }
+    
+    isComponentMountedRef.current = true;
+    console.log('Component mounting, initializing socket and media');
+    
     initializeSocket();
     initializeMedia();
 
     // Cleanup function
     return () => {
+      console.log('Cleaning up AdminInterviewSession component');
+      isComponentMountedRef.current = false;
+      // Clear the offer created set
+      offerCreatedRef.current.clear();
       if (socketRef.current) {
         socketRef.current.disconnect();
+        socketRef.current = null;
       }
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
       }
       if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
+        setLocalStream(null); // Clear the local stream state
       }
+      isInitializingRef.current = false;
     };
-  }, [code]);
+  }, []); // Empty dependency array to run only once
 
   // Add effect to handle socket reconnection
   useEffect(() => {
@@ -78,34 +120,46 @@ export default function AdminInterviewSession() {
       console.log('Socket reconnect attempt:', attemptNumber);
     };
 
+    const handleReconnectError = (error) => {
+      console.error('Socket reconnect error:', error);
+    };
+
+    const handleReconnectFailed = () => {
+      console.error('Socket reconnect failed');
+      setError('Connection to server lost. Please refresh the page.');
+    };
+
     socketRef.current.on('reconnect', handleReconnect);
     socketRef.current.on('reconnect_attempt', handleReconnectAttempt);
+    socketRef.current.on('reconnect_error', handleReconnectError);
+    socketRef.current.on('reconnect_failed', handleReconnectFailed);
 
     return () => {
       if (socketRef.current) {
         socketRef.current.off('reconnect', handleReconnect);
         socketRef.current.off('reconnect_attempt', handleReconnectAttempt);
+        socketRef.current.off('reconnect_error', handleReconnectError);
+        socketRef.current.off('reconnect_failed', handleReconnectFailed);
       }
     };
   }, [code]);
 
   const initializeSocket = () => {
-    // Connect to the signaling server with proper configuration
+    // Connect to the signaling server with improved configuration
     socketRef.current = io('http://localhost:5000', {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'], // Allow polling as fallback
       withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: 5,
-      timeout: 10000,
-      path: '/socket.io',
-      upgrade: false,
-      rememberUpgrade: false,
-      // Add additional options to prevent frame header issues
+      reconnectionAttempts: 15,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       randomizationFactor: 0.5,
-      // Ensure no extra headers that might cause issues
-      extraHeaders: {}
+      timeout: 20000,
+      path: '/socket.io',
+      upgrade: false,
+      rememberUpgrade: false,
+      forceNew: true,
+      rejectUnauthorized: false // Disable SSL verification for local development
     });
 
     socketRef.current.on('connect', () => {
@@ -154,6 +208,16 @@ export default function AdminInterviewSession() {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
           setCallAccepted(true);
           setIsConnected(true);
+          showNotificationPopup('Mentor joined the interview session');
+          setOtherParticipant(prev => ({ ...prev, hasVideo: true }));
+          console.log('Answer received and processed, isConnected set to true');
+          
+          // Force play the remote video if it exists
+          if (remoteVideoRef.current && remoteStream) {
+            remoteVideoRef.current.play().catch(error => {
+              console.log('Auto-play prevented for remote video:', error);
+            });
+          }
         } catch (error) {
           console.error('Error setting remote description:', error);
         }
@@ -163,7 +227,7 @@ export default function AdminInterviewSession() {
     // Handle ICE candidate
     socketRef.current.on('ice-candidate', async (data) => {
       console.log('Received ICE candidate:', data);
-      if (peerConnectionRef.current) {
+      if (peerConnectionRef.current && data.candidate) {
         try {
           await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
         } catch (error) {
@@ -176,20 +240,59 @@ export default function AdminInterviewSession() {
     socketRef.current.on('user-joined', (userId) => {
       console.log('User joined:', userId);
       console.log('Local stream available:', !!localStream);
+      console.log('Current caller state:', caller);
+      console.log('Peer connection status:', !!peerConnectionRef.current);
+    
       // Store the userId of the other user for later use
       setCaller(prev => {
-        const newCaller = prev || { sender: userId };
-        console.log('Setting caller to:', newCaller);
-        return newCaller;
+        // Only update if we don't already have a caller or if it's a different user
+        if (!prev || prev.sender !== userId) {
+          const newCaller = { sender: userId };
+          console.log('Setting caller to new user:', newCaller);
+          return newCaller;
+        }
+        console.log('Caller already set to same user, not updating:', prev);
+        return prev;
       });
-      // If we have a local stream, we can initiate a call
-      if (localStream) {
-        console.log('Creating offer for user:', userId);
-        setTimeout(() => {
-          createOffer(userId);
-        }, 1000); // Add a small delay to ensure peer connection is ready
+    
+      // Show notification when mentor joins
+      showNotificationPopup('Mentor joined the room');
+      setOtherParticipant(prev => ({ ...prev, hasVideo: false }));
+    
+      // If we have a local stream and peer connection, we can initiate a call immediately
+      if (localStream && peerConnectionRef.current) {
+        console.log('Local stream and peer connection ready, creating offer for user:', userId);
+        // Check if we've already created an offer for this user
+        if (!offerCreatedRef.current.has(userId)) {
+          offerCreatedRef.current.add(userId);
+          console.log('Creating offer for user:', userId);
+          // Add a small delay to ensure everything is ready
+          setTimeout(() => {
+            // Check if component is still mounted before creating offer
+            if (isComponentMountedRef.current) {
+              createOffer(userId);
+            }
+          }, 1500);
+        } else {
+          console.log('Offer already created for user:', userId);
+        }
       } else {
-        console.log('Local stream not ready yet, will create offer when ready');
+        console.log('Local stream or peer connection not ready yet, will create offer when ready');
+        console.log('Local stream status:', !!localStream, 'Peer connection status:', !!peerConnectionRef.current);
+        // Retry after a delay if not ready
+        setTimeout(() => {
+          if (isComponentMountedRef.current && localStream && peerConnectionRef.current && caller && caller.sender === userId) {
+            console.log('Retrying to create offer for user:', userId);
+            // Check if we've already created an offer for this user
+            if (!offerCreatedRef.current.has(userId)) {
+              offerCreatedRef.current.add(userId);
+              console.log('Creating offer for user:', userId);
+              createOffer(userId);
+            } else {
+              console.log('Offer already created for user:', userId);
+            }
+          }
+        }, 3000);
       }
     });
 
@@ -203,22 +306,92 @@ export default function AdminInterviewSession() {
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = null;
       }
+      showNotificationPopup('Mentor left the room');
+      setOtherParticipant(prev => ({ ...prev, hasVideo: false }));
+      console.log('User left, isConnected set to false');
+    });
+
+    // Handle chat messages
+    socketRef.current.on('message', (data) => {
+      console.log('Received message:', data);
+      // Check if data and data.message exist before accessing properties
+      if (data && data.message) {
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          text: data.message.text || '',
+          sender: data.message.sender || '',
+          timestamp: data.message.timestamp || new Date().toLocaleTimeString(),
+          isOwn: data.message.sender === socketRef.current.id
+        }]);
+      }
     });
   };
 
   const initializeMedia = async () => {
+    // Check if component is still mounted
+    if (!isComponentMountedRef.current) {
+      console.log('Component unmounted, skipping media initialization');
+      return;
+    }
+    
+    console.log('initializeMedia called, localStream:', !!localStream, 'isInitializingRef:', isInitializingRef.current);
+    
+    // Prevent multiple initializations
+    if (localStream) {
+      console.log('Local stream already initialized');
+      return;
+    }
+    
+    // Prevent concurrent initializations
+    if (isInitializingRef.current) {
+      console.log('Media initialization already in progress');
+      return;
+    }
+    
+    isInitializingRef.current = true;
+    
     try {
       console.log('Initializing media devices...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }, 
+        audio: { 
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
       });
+      
+      // Check if component is still mounted after async operation
+      if (!isComponentMountedRef.current) {
+        console.log('Component unmounted during async operation, stopping stream tracks');
+        stream.getTracks().forEach(track => track.stop());
+        isInitializingRef.current = false;
+        return;
+      }
+      
+      console.log('Media stream acquired, checking if localStream already set:', !!localStream);
+      
+      // Double check if stream was already set during async operation
+      if (localStream) {
+        console.log('Local stream was set during async operation, stopping new stream tracks');
+        stream.getTracks().forEach(track => track.stop());
+        isInitializingRef.current = false;
+        return;
+      }
       
       console.log('Media stream acquired:', stream);
       setLocalStream(stream);
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        // Force video element to play
+        localVideoRef.current.play().catch(error => {
+          console.log('Auto-play prevented for local video:', error);
+        });
       }
       
       // Create peer connection
@@ -228,20 +401,51 @@ export default function AdminInterviewSession() {
       // If there's already a user in the room, initiate a call
       if (caller && caller.sender) {
         console.log('Creating offer for existing user:', caller.sender);
-        setTimeout(() => {
-          createOffer(caller.sender);
-        }, 1000); // Add a small delay to ensure peer connection is ready
+        // Check if we've already created an offer for this user
+        if (!offerCreatedRef.current.has(caller.sender)) {
+          offerCreatedRef.current.add(caller.sender);
+          console.log('Creating offer for user:', caller.sender);
+          // Add a small delay to ensure everything is ready
+          setTimeout(() => {
+            // Check if component is still mounted before creating offer
+            if (isComponentMountedRef.current) {
+              createOffer(caller.sender);
+            }
+          }, 1500);
+        } else {
+          console.log('Offer already created for user:', caller.sender);
+        }
       }
       
     } catch (error) {
-      console.error('Error accessing media devices:', error);
-      setError('Failed to access camera/microphone. Please check permissions.');
+      // Check if component is still mounted before setting error
+      if (isComponentMountedRef.current) {
+        console.error('Error accessing media devices:', error);
+        setError('Failed to access camera/microphone. Please check permissions.');
+      }
+      isInitializingRef.current = false; // Make sure to reset on error
     } finally {
-      setLoading(false);
+      // Check if component is still mounted before setting loading state
+      if (isComponentMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   const createPeerConnection = (stream) => {
+    // Validate stream before creating peer connection
+    if (!stream || !stream.active) {
+      console.error('Invalid or inactive media stream provided to createPeerConnection');
+      setError('Failed to initialize media connection. Please try again.');
+      return;
+    }
+    
+    // Prevent creating multiple peer connections
+    if (peerConnectionRef.current) {
+      console.log('Peer connection already exists, closing existing connection');
+      peerConnectionRef.current.close();
+    }
+    
     peerConnectionRef.current = new RTCPeerConnection(configuration);
     
     // Add local stream to peer connection
@@ -251,11 +455,18 @@ export default function AdminInterviewSession() {
     
     // Handle remote stream
     peerConnectionRef.current.ontrack = (event) => {
-      console.log('Received remote stream');
+      console.log('Received remote stream:', event.streams[0]);
       setRemoteStream(event.streams[0]);
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = event.streams[0];
+        // Force video element to play
+        remoteVideoRef.current.play().catch(error => {
+          console.log('Auto-play prevented:', error);
+        });
       }
+      setOtherParticipant(prev => ({ ...prev, hasVideo: true }));
+      setIsConnected(true); // Set connected status when we receive remote stream
+      console.log('Connection established, isConnected set to true');
     };
     
     // Handle ICE candidates
@@ -274,9 +485,11 @@ export default function AdminInterviewSession() {
       console.log('Connection state:', peerConnectionRef.current.connectionState);
       if (peerConnectionRef.current.connectionState === 'connected') {
         setIsConnected(true);
+        console.log('Connection established via state change, isConnected set to true');
       } else if (peerConnectionRef.current.connectionState === 'disconnected' || 
                  peerConnectionRef.current.connectionState === 'failed') {
         setIsConnected(false);
+        console.log('Connection lost via state change, isConnected set to false');
       }
     };
     
@@ -286,17 +499,35 @@ export default function AdminInterviewSession() {
       if (peerConnectionRef.current.iceConnectionState === 'disconnected' || 
           peerConnectionRef.current.iceConnectionState === 'failed') {
         setIsConnected(false);
+        console.log('ICE connection lost, isConnected set to false');
+      } else if (peerConnectionRef.current.iceConnectionState === 'connected' || 
+                 peerConnectionRef.current.iceConnectionState === 'completed') {
+        setIsConnected(true);
+        console.log('ICE connection established, isConnected set to true');
       }
     };
   };
 
   const createOffer = async (targetUserId) => {
+    // Check if component is still mounted
+    if (!isComponentMountedRef.current) {
+      console.log('Component unmounted, skipping offer creation');
+      return;
+    }
+    
+    // Prevent creating multiple offers
+    if (!peerConnectionRef.current) {
+      console.log('Peer connection not ready yet');
+      return;
+    }
+    
+    // Check if we already have a local description (offer/answer)
+    if (peerConnectionRef.current.localDescription) {
+      console.log('Local description already exists, skipping offer creation');
+      return;
+    }
+    
     try {
-      if (!peerConnectionRef.current) {
-        console.log('Peer connection not ready yet');
-        return;
-      }
-      
       console.log('Creating offer for:', targetUserId);
       const offer = await peerConnectionRef.current.createOffer();
       await peerConnectionRef.current.setLocalDescription(offer);
@@ -308,7 +539,10 @@ export default function AdminInterviewSession() {
         });
       }
     } catch (error) {
-      console.error('Error creating offer:', error);
+      // Check if component is still mounted before logging error
+      if (isComponentMountedRef.current) {
+        console.error('Error creating offer:', error);
+      }
     }
   };
 
@@ -327,12 +561,23 @@ export default function AdminInterviewSession() {
     }
   };
 
-  const toggleVideo = () => {
+  const toggleVideo = async () => {
     if (localStream) {
-      localStream.getVideoTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      setIsVideoOff(!isVideoOff);
+      const videoTracks = localStream.getVideoTracks();
+      
+      if (!isVideoOff) {
+        // Turn off video
+        videoTracks.forEach(track => {
+          track.enabled = false;
+        });
+        setIsVideoOff(true);
+      } else {
+        // Turn on video
+        videoTracks.forEach(track => {
+          track.enabled = true;
+        });
+        setIsVideoOff(false);
+      }
     }
   };
 
@@ -359,6 +604,42 @@ export default function AdminInterviewSession() {
     setIsCalling(false);
     setCaller(null);
   };
+
+  const sendMessage = () => {
+    if (newMessage.trim() && socketRef.current) {
+      const messageData = {
+        text: newMessage,
+        sender: socketRef.current.id,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      // Send to server
+      socketRef.current.emit('message', { roomId: code, message: messageData });
+      
+      // Add to local messages
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        text: newMessage,
+        sender: messageData.sender,
+        timestamp: messageData.timestamp,
+        isOwn: true
+      }]);
+      
+      setNewMessage("");
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  // Scroll to bottom of messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   if (loading) {
     return (
@@ -393,8 +674,19 @@ export default function AdminInterviewSession() {
     );
   }
 
+  // Main Content
   return (
     <div className="min-h-screen bg-gray-900">
+      {/* Notification Popup */}
+      {showNotification && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="bg-gray-800 border-l-4 border-green-500 text-white p-4 rounded shadow-lg flex items-center">
+            <CheckCircle className="h-5 w-5 mr-2 text-green-500" />
+            <span>{notificationMessage}</span>
+          </div>
+        </div>
+      )}
+
       {/* Incoming Call Modal */}
       {isCalling && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
@@ -440,50 +732,148 @@ export default function AdminInterviewSession() {
             <span className="text-white text-sm">
               {isConnected ? 'Connected' : 'Connecting...'}
             </span>
+            <button 
+              onClick={() => setShowChat(!showChat)}
+              className="ml-4 p-2 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors"
+            >
+              <MessageCircle className="h-5 w-5 text-white" />
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex flex-1 h-[calc(100vh-120px)]">
-        {/* Video Area */}
-        <div className="flex-1 relative">
-          {/* Remote Video */}
+        {/* Video Area - Modified for Admin View */}
+        <div className={`${showChat ? 'w-3/4' : 'flex-1'} relative`}>
+          {/* Show Mentor's video as main view for admin */}
           <div className="h-full bg-black flex items-center justify-center">
             <div className="relative w-full h-full flex items-center justify-center">
-              <video
-                ref={remoteVideoRef}
-                autoPlay
-                playsInline
-                className={`w-full h-full ${!remoteStream ? 'hidden' : ''}`}
-              />
-              
-              {!remoteStream && (
-                <div className="text-center text-gray-400">
-                  <Users className="h-16 w-16 mx-auto mb-4" />
-                  <p>Waiting for participant to join...</p>
+              {/* Remote Video Container */}
+              {remoteStream ? (
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="bg-gray-800 border-2 border-gray-700 rounded-lg w-full h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="relative">
+                      <div className="bg-gray-700 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-4">
+                        <User className="h-16 w-16 text-gray-400" />
+                      </div>
+                      {!isConnected && (
+                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-white text-xs px-2 py-1 rounded flex items-center">
+                          <AlertCircle className="h-3 w-3 mr-1" />
+                          Waiting
+                        </div>
+                      )}
+                      {isConnected && (
+                        <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-xs px-2 py-1 rounded flex items-center">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Connected
+                        </div>
+                      )}
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Mentor</h3>
+                    <p className="text-gray-400 mb-4">
+                      {isConnected ? 'Video feed will appear here' : 'Waiting for mentor to join...'}
+                    </p>
+                  </div>
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Local Video Overlay */}
-          <div className="absolute bottom-4 right-4 w-1/4 max-w-xs">
-            <div className="relative bg-black rounded-lg overflow-hidden border-2 border-gray-700">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-2 left-2 flex space-x-2">
-                <div className={`h-3 w-3 rounded-full ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                <div className={`h-3 w-3 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-green-500'}`}></div>
+              
+              {/* Show Admin's video as overlay for admin */}
+              <div className="absolute bottom-4 right-4 w-1/4 max-w-xs">
+                <div className="relative bg-black rounded-lg overflow-hidden border-2 border-gray-700">
+                  {localStream ? (
+                    <video
+                      ref={localVideoRef}
+                      autoPlay
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="bg-gray-700 w-full h-full flex items-center justify-center">
+                      <User className="h-8 w-8 text-gray-400" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 left-2 flex space-x-2">
+                    <div className={`h-3 w-3 rounded-full ${isMuted ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    <div className={`h-3 w-3 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                  </div>
+                  <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+                    You (Admin)
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Chat Sidebar */}
+        {showChat && (
+          <div className="w-1/4 bg-gray-800 border-l border-gray-700 flex flex-col">
+            <div className="p-4 border-b border-gray-700">
+              <h2 className="font-semibold text-lg">Chat</h2>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {messages.length === 0 ? (
+                <div className="text-center text-gray-400 py-8">
+                  <MessageCircle className="h-12 w-12 mx-auto mb-2" />
+                  <p>No messages yet</p>
+                  <p className="text-sm">Send a message to start the conversation</p>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div 
+                    key={message.id} 
+                    className={`flex ${message.isOwn ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div 
+                      className={`max-w-xs px-3 py-2 rounded-lg text-sm ${
+                        message.isOwn
+                          ? 'bg-blue-600 text-white' 
+                          : 'bg-gray-700 text-gray-100'
+                      }`}
+                    >
+                      <p>{message.text}</p>
+                      <p className={`text-xs mt-1 ${
+                        message.isOwn ? 'text-blue-200' : 'text-gray-400'
+                      }`}>
+                        {message.timestamp}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+            
+            <div className="p-4 border-t border-gray-700">
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={sendMessage}
+                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm transition-colors flex items-center"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Controls */}
@@ -492,6 +882,7 @@ export default function AdminInterviewSession() {
           <button
             onClick={toggleMute}
             className={`p-3 rounded-full ${isMuted ? 'bg-red-500' : 'bg-gray-700'} hover:bg-gray-600 transition-colors`}
+            title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
           >
             {isMuted ? <MicOff className="h-6 w-6 text-white" /> : <Mic className="h-6 w-6 text-white" />}
           </button>
@@ -499,6 +890,7 @@ export default function AdminInterviewSession() {
           <button
             onClick={toggleVideo}
             className={`p-3 rounded-full ${isVideoOff ? 'bg-red-500' : 'bg-gray-700'} hover:bg-gray-600 transition-colors`}
+            title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
           >
             {isVideoOff ? <VideoOff className="h-6 w-6 text-white" /> : <Video className="h-6 w-6 text-white" />}
           </button>
@@ -506,6 +898,7 @@ export default function AdminInterviewSession() {
           <button
             onClick={endCall}
             className="p-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors"
+            title="End call"
           >
             <PhoneOff className="h-6 w-6 text-white" />
           </button>

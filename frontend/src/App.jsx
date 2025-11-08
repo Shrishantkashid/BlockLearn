@@ -24,6 +24,8 @@ import RedirectTest from "./RedirectTest.jsx";
 // Mentor pages
 import MentorOnboarding from "./pages/MentorOnboarding.jsx";
 import MentorDashboard from "./pages/MentorDashboard.jsx";
+import MentorProfileView from "./pages/MentorProfileView.jsx";
+import MentorSessions from "./pages/MentorSessions.jsx";
 
 // Interview pages
 import InterviewCodeEntry from "./pages/InterviewCodeEntry.jsx";
@@ -31,6 +33,13 @@ import InterviewSession from "./pages/InterviewSession.jsx";
 
 // Live session pages
 import LiveSession from "./pages/LiveSession.jsx";
+
+// Mentor-Admin video call pages
+import MentorAdminVideoCall from "./pages/MentorAdminVideoCall.jsx";
+import MentorAdminCallLanding from "./pages/MentorAdminCallLanding.jsx";
+
+// WebRTC test page
+import WebRTCTest from "./pages/WebRTCTest.jsx";
 
 // Protected Route component
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -43,6 +52,9 @@ import AdminLogin from "./pages/AdminLogin.jsx";
 
 // Import the admin interview session page
 import AdminInterviewSession from "./pages/AdminInterviewSession.jsx";
+
+// Import the schedule session page
+import ScheduleSession from "./pages/ScheduleSession.jsx";
 
 function App() {
   return (
@@ -135,6 +147,18 @@ function App() {
         </ProtectedRoute>
       } />
       
+      <Route path="/mentor/sessions" element={
+        <ProtectedRoute>
+          <MentorSessions />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/mentor/profile/:mentorId" element={
+        <ProtectedRoute>
+          <MentorProfileView />
+        </ProtectedRoute>
+      } />
+      
       {/* Interview routes */}
       <Route path="/interview/code-entry" element={
         <ProtectedRoute>
@@ -152,6 +176,20 @@ function App() {
       <Route path="/session/live/:code" element={
         <ProtectedRoute>
           <LiveSession />
+        </ProtectedRoute>
+      } />
+      
+      {/* Mentor-Admin video call routes */}
+      <Route path="/mentor-admin-call" element={<MentorAdminVideoCall />} />
+      <Route path="/mentor-admin-landing" element={<MentorAdminCallLanding />} />
+      
+      {/* WebRTC test route */}
+      <Route path="/webrtc-test" element={<WebRTCTest />} />
+      
+      {/* Schedule session route */}
+      <Route path="/schedule-session/:sessionId" element={
+        <ProtectedRoute>
+          <ScheduleSession />
         </ProtectedRoute>
       } />
       

@@ -115,4 +115,111 @@ const sendWelcomeEmail = async (to, firstName, userType) => {
   }
 };
 
-module.exports = { sendOTP, sendWelcomeEmail };
+// Function to send session scheduling email
+const sendSessionScheduledEmail = async (learnerEmail, learnerName, mentorEmail, mentorName, sessionDetails) => {
+  try {
+    // Send email to learner
+    await transporter.sendMail({
+      from: `"BlockLearn Platform" <${process.env.EMAIL_USER}>`,
+      to: learnerEmail,
+      subject: `Session Scheduled with ${mentorName} - BlockLearn`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
+          <div style="background-color: #ffffff; border-radius: 10px; padding: 30px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #2b57af; font-size: 28px; margin-bottom: 10px;">Session Scheduled!</h1>
+              <div style="width: 60px; height: 4px; background-color: #2b57af; margin: 0 auto;"></div>
+            </div>
+            
+            <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">Hi ${learnerName},</p>
+            
+            <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">
+              Your session with <strong>${mentorName}</strong> has been scheduled successfully.
+            </p>
+            
+            <div style="background-color: #e8f4ff; padding: 20px; border-radius: 8px; margin: 25px 0;">
+              <h2 style="color: #2b57af; margin-top: 0;">Session Details</h2>
+              <p style="margin: 10px 0;"><strong>Skill:</strong> ${sessionDetails.skillName}</p>
+              <p style="margin: 10px 0;"><strong>Date & Time:</strong> ${new Date(sessionDetails.scheduledAt).toLocaleString()}</p>
+              <p style="margin: 10px 0;"><strong>Duration:</strong> ${sessionDetails.durationMinutes} minutes</p>
+              ${sessionDetails.location ? `<p style="margin: 10px 0;"><strong>Location:</strong> ${sessionDetails.location}</p>` : ''}
+              ${sessionDetails.notes ? `<p style="margin: 10px 0;"><strong>Notes:</strong> ${sessionDetails.notes}</p>` : ''}
+            </div>
+            
+            <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">
+              Please make sure to be available at the scheduled time. You can view all your sessions in your dashboard.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="http://localhost:5173/sessions" style="background-color: #2b57af; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">View Sessions</a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666666; margin-top: 30px;">
+              If you need to reschedule or have any questions, please contact your mentor at ${mentorEmail}.
+            </p>
+            
+            <div style="border-top: 1px solid #eeeeee; margin-top: 30px; padding-top: 20px; text-align: center;">
+              <p style="font-size: 12px; color: #999999;">© 2023 BlockLearn. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+    
+    // Send email to mentor
+    await transporter.sendMail({
+      from: `"BlockLearn Platform" <${process.env.EMAIL_USER}>`,
+      to: mentorEmail,
+      subject: `Session Scheduled with ${learnerName} - BlockLearn`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
+          <div style="background-color: #ffffff; border-radius: 10px; padding: 30px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #2b57af; font-size: 28px; margin-bottom: 10px;">Session Scheduled!</h1>
+              <div style="width: 60px; height: 4px; background-color: #2b57af; margin: 0 auto;"></div>
+            </div>
+            
+            <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">Hi ${mentorName},</p>
+            
+            <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">
+              Your session with <strong>${learnerName}</strong> has been scheduled successfully.
+            </p>
+            
+            <div style="background-color: #e8f4ff; padding: 20px; border-radius: 8px; margin: 25px 0;">
+              <h2 style="color: #2b57af; margin-top: 0;">Session Details</h2>
+              <p style="margin: 10px 0;"><strong>Skill:</strong> ${sessionDetails.skillName}</p>
+              <p style="margin: 10px 0;"><strong>Date & Time:</strong> ${new Date(sessionDetails.scheduledAt).toLocaleString()}</p>
+              <p style="margin: 10px 0;"><strong>Duration:</strong> ${sessionDetails.durationMinutes} minutes</p>
+              ${sessionDetails.location ? `<p style="margin: 10px 0;"><strong>Location:</strong> ${sessionDetails.location}</p>` : ''}
+              ${sessionDetails.notes ? `<p style="margin: 10px 0;"><strong>Notes:</strong> ${sessionDetails.notes}</p>` : ''}
+            </div>
+            
+            <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">
+              Please make sure to be available at the scheduled time. You can view all your sessions in your dashboard.
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="http://localhost:5173/mentor/dashboard" style="background-color: #2b57af; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">View Sessions</a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666666; margin-top: 30px;">
+              If you need to reschedule or have any questions, please contact your student at ${learnerEmail}.
+            </p>
+            
+            <div style="border-top: 1px solid #eeeeee; margin-top: 30px; padding-top: 20px; text-align: center;">
+              <p style="font-size: 12px; color: #999999;">© 2023 BlockLearn. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      `,
+    });
+    
+    console.log('Session scheduled emails sent to learner and mentor');
+    return true;
+  } catch (error) {
+    console.error('Error sending session scheduled emails:', error);
+    return false;
+  }
+};
+
+module.exports = { sendOTP, sendWelcomeEmail, sendSessionScheduledEmail };

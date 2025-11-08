@@ -1,13 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import path from 'path'
 
 export default defineConfig({
-  plugins: [react()],
+  root: '.', // Set the root to the current directory
+  plugins: [
+    react(),
+    nodePolyfills({
+      protocolImports: true,
+    })
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src')
     }
+  },
+  define: {
+    global: 'globalThis',
+    'process.env': {}
   },
   server: {
     proxy: {
@@ -20,7 +31,7 @@ export default defineConfig({
   },
   // Add build configuration for Vercel
   build: {
-    outDir: 'dist',
+    outDir: '../dist', // Build to the parent directory's dist folder
     assetsDir: 'assets',
     rollupOptions: {
       output: {
@@ -33,5 +44,9 @@ export default defineConfig({
     }
   },
   // Add base path for Vercel deployments
-  base: '/'
+  base: '/',
+  // Add optimizeDeps to handle buffer
+  optimizeDeps: {
+    include: ['buffer']
+  }
 })

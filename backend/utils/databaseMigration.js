@@ -68,6 +68,70 @@ async function initializeDatabase() {
       console.log('✅ user_type field added to users collection');
     }
     
+    // Create skills collection if it doesn't exist
+    if (!collectionNames.includes('skills')) {
+      console.log('Creating skills collection...');
+      await db.createCollection('skills');
+      console.log('✅ skills collection created');
+    }
+    
+    // Create indexes for skills
+    const skillsCollection = db.collection('skills');
+    await skillsCollection.createIndex({ name: 1 });
+    await skillsCollection.createIndex({ category: 1 });
+    console.log('✅ skills indexes created');
+    
+    // Insert default skills if collection is empty
+    const skillsCount = await skillsCollection.countDocuments();
+    if (skillsCount === 0) {
+      console.log('Inserting default skills...');
+      const defaultSkills = [
+        { name: "JavaScript", category: "Programming" },
+        { name: "Python", category: "Programming" },
+        { name: "React", category: "Programming" },
+        { name: "Node.js", category: "Programming" },
+        { name: "UI/UX Design", category: "Design" },
+        { name: "Figma", category: "Design" },
+        { name: "Photography", category: "Arts" },
+        { name: "Guitar", category: "Music" },
+        { name: "Spanish", category: "Languages" },
+        { name: "Cooking", category: "Life Skills" }
+      ];
+      await skillsCollection.insertMany(defaultSkills);
+      console.log('✅ Default skills inserted');
+    }
+    
+    // Create mentor_connections collection if it doesn't exist
+    if (!collectionNames.includes('mentor_connections')) {
+      console.log('Creating mentor_connections collection...');
+      await db.createCollection('mentor_connections');
+      console.log('✅ mentor_connections collection created');
+    }
+    
+    // Create indexes for mentor_connections
+    const mentorConnections = db.collection('mentor_connections');
+    await mentorConnections.createIndex({ learner_id: 1 });
+    await mentorConnections.createIndex({ mentor_id: 1 });
+    await mentorConnections.createIndex({ status: 1 });
+    await mentorConnections.createIndex({ created_at: -1 });
+    await mentorConnections.createIndex({ learner_id: 1, mentor_id: 1, status: 1 }); // Compound index
+    console.log('✅ mentor_connections indexes created');
+    
+    // Create user_skills collection if it doesn't exist
+    if (!collectionNames.includes('user_skills')) {
+      console.log('Creating user_skills collection...');
+      await db.createCollection('user_skills');
+      console.log('✅ user_skills collection created');
+    }
+    
+    // Create indexes for user_skills
+    const userSkills = db.collection('user_skills');
+    await userSkills.createIndex({ user_id: 1 });
+    await userSkills.createIndex({ skill_id: 1 });
+    await userSkills.createIndex({ skill_type: 1 });
+    await userSkills.createIndex({ user_id: 1, skill_type: 1 }); // Compound index
+    console.log('✅ user_skills indexes created');
+    
     console.log('✅ Database initialization complete');
   } catch (error) {
     console.error('Error initializing database:', error);

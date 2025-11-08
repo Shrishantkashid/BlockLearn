@@ -8,6 +8,16 @@
     {
       "src": "api/[[...all]].js",
       "use": "@vercel/node"
+<<<<<<< HEAD
+=======
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+>>>>>>> 7e14de0 (deployement 8)
     }
   ],
   "routes": [
