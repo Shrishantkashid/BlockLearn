@@ -1,5 +1,5 @@
 import React from "react";
-import { useTheme } from "next-themes";
+import { useTheme } from "../providers/ThemeProvider";
 
 export default function Settings() {
   const { theme, setTheme, systemTheme } = useTheme();
@@ -43,15 +43,3 @@ export default function Settings() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-

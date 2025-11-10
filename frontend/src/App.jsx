@@ -38,6 +38,9 @@ import LiveSession from "./pages/LiveSession.jsx";
 import MentorAdminVideoCall from "./pages/MentorAdminVideoCall.jsx";
 import MentorAdminCallLanding from "./pages/MentorAdminCallLanding.jsx";
 
+// Mentor-Student video call pages
+import MentorStudentVideoCall from "./pages/MentorStudentVideoCall.jsx";
+
 // WebRTC test page
 import WebRTCTest from "./pages/WebRTCTest.jsx";
 
@@ -55,6 +58,10 @@ import AdminInterviewSession from "./pages/AdminInterviewSession.jsx";
 
 // Import the schedule session page
 import ScheduleSession from "./pages/ScheduleSession.jsx";
+
+// Import the mutual session booking pages
+import MentorSessionBookingPage from "./pages/MentorSessionBookingPage.jsx";
+import LearnerSessionBookingPage from "./pages/LearnerSessionBookingPage.jsx";
 
 function App() {
   return (
@@ -159,6 +166,32 @@ function App() {
         </ProtectedRoute>
       } />
       
+      {/* Mentor session booking route */}
+      <Route path="/mentor/session-booking" element={
+        <ProtectedRoute>
+          <MentorSessionBookingPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/mentor/session-booking/:sessionId" element={
+        <ProtectedRoute>
+          <MentorSessionBookingPage />
+        </ProtectedRoute>
+      } />
+      
+      {/* Learner session booking route */}
+      <Route path="/learner/session-booking" element={
+        <ProtectedRoute>
+          <LearnerSessionBookingPage />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/learner/session-booking/:sessionId" element={
+        <ProtectedRoute>
+          <LearnerSessionBookingPage />
+        </ProtectedRoute>
+      } />
+      
       {/* Interview routes */}
       <Route path="/interview/code-entry" element={
         <ProtectedRoute>
@@ -183,9 +216,12 @@ function App() {
       <Route path="/mentor-admin-call" element={<MentorAdminVideoCall />} />
       <Route path="/mentor-admin-landing" element={<MentorAdminCallLanding />} />
       
+      {/* Mentor-Student video call routes */}
+      <Route path="/mentor-student-call" element={<MentorStudentVideoCall />} />
+      
       {/* WebRTC test route */}
       <Route path="/webrtc-test" element={<WebRTCTest />} />
-      
+
       {/* Schedule session route */}
       <Route path="/schedule-session/:sessionId" element={
         <ProtectedRoute>

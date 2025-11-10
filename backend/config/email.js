@@ -144,7 +144,18 @@ const sendSessionScheduledEmail = async (learnerEmail, learnerName, mentorEmail,
               <p style="margin: 10px 0;"><strong>Duration:</strong> ${sessionDetails.durationMinutes} minutes</p>
               ${sessionDetails.location ? `<p style="margin: 10px 0;"><strong>Location:</strong> ${sessionDetails.location}</p>` : ''}
               ${sessionDetails.notes ? `<p style="margin: 10px 0;"><strong>Notes:</strong> ${sessionDetails.notes}</p>` : ''}
+              ${sessionDetails.liveSessionCode ? `<p style="margin: 10px 0;"><strong>Video Call Room Code:</strong> ${sessionDetails.liveSessionCode}</p>` : ''}
             </div>
+            
+            ${sessionDetails.liveSessionCode ? `
+            <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #ffeaa7;">
+              <h2 style="color: #856404; margin-top: 0;">Video Call Information</h2>
+              <p style="margin: 10px 0;">Join the video call using the link below:</p>
+              <p style="margin: 10px 0;"><strong>Meeting Link:</strong> <a href="${sessionDetails.meetingLink}" style="color: #2b57af;">${sessionDetails.meetingLink}</a></p>
+              <p style="margin: 10px 0;"><strong>Room Code:</strong> ${sessionDetails.liveSessionCode}</p>
+              <p style="margin: 10px 0; font-size: 14px; color: #666666;">Share this code with your mentor if needed for direct access.</p>
+            </div>
+            ` : ''}
             
             <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">
               Please make sure to be available at the scheduled time. You can view all your sessions in your dashboard.
@@ -192,7 +203,18 @@ const sendSessionScheduledEmail = async (learnerEmail, learnerName, mentorEmail,
               <p style="margin: 10px 0;"><strong>Duration:</strong> ${sessionDetails.durationMinutes} minutes</p>
               ${sessionDetails.location ? `<p style="margin: 10px 0;"><strong>Location:</strong> ${sessionDetails.location}</p>` : ''}
               ${sessionDetails.notes ? `<p style="margin: 10px 0;"><strong>Notes:</strong> ${sessionDetails.notes}</p>` : ''}
+              ${sessionDetails.liveSessionCode ? `<p style="margin: 10px 0;"><strong>Video Call Room Code:</strong> ${sessionDetails.liveSessionCode}</p>` : ''}
             </div>
+            
+            ${sessionDetails.liveSessionCode ? `
+            <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border: 1px solid #ffeaa7;">
+              <h2 style="color: #856404; margin-top: 0;">Video Call Information</h2>
+              <p style="margin: 10px 0;">Join the video call using the link below:</p>
+              <p style="margin: 10px 0;"><strong>Meeting Link:</strong> <a href="${sessionDetails.meetingLink}" style="color: #2b57af;">${sessionDetails.meetingLink}</a></p>
+              <p style="margin: 10px 0;"><strong>Room Code:</strong> ${sessionDetails.liveSessionCode}</p>
+              <p style="margin: 10px 0; font-size: 14px; color: #666666;">Share this code with your student if needed for direct access.</p>
+            </div>
+            ` : ''}
             
             <p style="font-size: 16px; color: #333333; margin-bottom: 20px;">
               Please make sure to be available at the scheduled time. You can view all your sessions in your dashboard.

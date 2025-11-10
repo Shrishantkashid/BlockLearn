@@ -131,7 +131,6 @@ function MentorDashboard() {
         // Handle API error response
         console.error("API Error:", response.message);
         // Show error to user
-        // Optionally show an error message to the user
       }
     } catch (error) {
       console.error("Error fetching connection requests:", error);
@@ -140,10 +139,15 @@ function MentorDashboard() {
         // Token might be expired, clear local storage and redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('userData');
-        navigate('/prelogin');
+        // Instead of navigating directly, let's show an error message
+        // The ProtectedRoute will handle the redirect to prelogin
+        console.error("Authentication error - token may be expired");
       } else if (error.response && error.response.status === 403) {
         // User is not authorized (might not be a mentor)
         console.error("User not authorized to view connections");
+      } else {
+        // Other errors
+        console.error("Unexpected error:", error);
       }
       // Optionally show an error message to the user
     } finally {
@@ -339,23 +343,14 @@ function MentorDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <Award className="w-5 h-5" />
-                  <span className="font-medium">Scheduled</span>
-                </div>
-                <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">
-                  Interview Code: {interview.interview_code}
-                </p>
+              <div className="mt-4">
+                <Link 
+                  to={interview.meeting_link}
+                  className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Join Interview
+                </Link>
               </div>
-            </div>
-            <div className="mt-4">
-              <Link
-                to={interview.meeting_link}
-                className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                Join Interview
-              </Link>
             </div>
           </div>
         ) : user.mentorApproved === true ? (
@@ -394,12 +389,20 @@ function MentorDashboard() {
               <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
                 Connection Requests
               </h2>
-              <button 
-                onClick={fetchConnectionRequests}
-                className="text-sm text-primary hover:text-primary/80"
-              >
-                Refresh
-              </button>
+              <div className="flex space-x-2">
+                <button 
+                  onClick={fetchConnectionRequests}
+                  className="text-sm text-primary hover:text-primary/80"
+                >
+                  Refresh
+                </button>
+                <Link 
+                  to="/mentor/session-booking"
+                  className="text-sm text-primary hover:text-primary/80"
+                >
+                  Book New Session
+                </Link>
+              </div>
             </div>
             
             {connectionsLoading ? (
@@ -517,6 +520,13 @@ function MentorDashboard() {
                             Join Session
                           </Link>
                         )}
+                        <Link 
+                          to={`/mentor/session-booking/${session.id}`}
+                          className="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
+                        >
+                          Edit Session
+                        </Link>
+
                       </div>
                     </div>
                   ))
@@ -586,20 +596,6 @@ function MentorDashboard() {
 
             <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
               <div className="flex items-center">
-                <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
-                  <Award className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Sessions Completed</p>
-                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
-                    {sessions.filter(s => s.status === 'completed').length}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
-              <div className="flex items-center">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
                   <Calendar className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
@@ -607,6 +603,20 @@ function MentorDashboard() {
                   <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Upcoming Sessions</p>
                   <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
                     {sessions.filter(s => s.status === 'scheduled').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
+              <div className="flex items-center">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+                  <MessageSquare className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600 dark:text-slate-400">Connection Requests</p>
+                  <p className="text-2xl font-semibold text-gray-900 dark:text-slate-100">
+                    {connectionRequests.filter(r => r.status === 'pending').length}
                   </p>
                 </div>
               </div>

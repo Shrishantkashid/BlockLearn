@@ -173,7 +173,52 @@ const initializeSocket = (server) => {
         socket.to(data.roomId).emit('message', {
           message: data.message,
           sender: socket.id, // Include sender ID at the top level for consistency
-          timestamp: data.message?.timestamp || new Date().toLocaleTimeString()
+          senderType: data.senderType, // 'mentor' or 'learner'
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle proposed times for session scheduling
+    socket.on('propose-time', (data) => {
+      console.log('Received proposed time from:', socket.id, 'in room:', data.roomId, 'dateTime:', data.dateTime);
+      // Broadcast proposed time to all users in the room except sender
+      if (data.roomId) {
+        socket.to(data.roomId).emit('propose-time', {
+          proposerType: data.proposerType, // 'mentor' or 'learner'
+          dateTime: data.dateTime,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle session scheduled event
+    socket.on('session-scheduled', (data) => {
+      console.log('Session scheduled by:', socket.id, 'in room:', data.roomId);
+      // Broadcast session scheduled event to all users in the room except sender
+      if (data.roomId) {
+        socket.to(data.roomId).emit('session-scheduled', {
+          scheduled_at: data.scheduled_at,
+          duration_minutes: data.duration_minutes,
+          location: data.location || 'Online', // Default to 'Online' if not provided
+          notes: data.notes,
+          live_session_code: data.live_session_code, // Include live session code
+          meeting_link: data.meeting_link // Include meeting link
+        });
+      }
+    });
+
+    // Handle proposal responses
+    socket.on('proposal-response', (data) => {
+      console.log('Received proposal response from:', socket.id, 'in room:', data.roomId, 'response:', data.response);
+      // Broadcast proposal response to all users in the room except sender
+      if (data.roomId) {
+        socket.to(data.roomId).emit('proposal-response', {
+          proposalId: data.proposalId,
+          response: data.response, // 'accepted' or 'rejected'
+          responderType: data.responderType, // 'mentor' or 'learner'
+          dateTime: data.dateTime,
+          timestamp: data.timestamp || new Date().toISOString()
         });
       }
     });

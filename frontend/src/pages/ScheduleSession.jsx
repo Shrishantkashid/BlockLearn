@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Mail, Calendar } from 'lucide-react';
 import api from '../api';
-import SessionSchedulingChat from '../components/SessionSchedulingChat';
+import MutualSessionBooking from '../components/MutualSessionBooking';
 
 const ScheduleSession = () => {
   const { sessionId } = useParams();
@@ -206,11 +206,12 @@ const ScheduleSession = () => {
             </div>
 
             {/* Chat Component */}
-            <SessionSchedulingChat
+            <MutualSessionBooking
               sessionId={session.id}
               mentor={session.mentor}
               student={session.student}
               skill={session.skill}
+              currentUser={JSON.parse(localStorage.getItem('userData') || '{}')}
               onSessionScheduled={handleSessionScheduled}
             />
           </div>

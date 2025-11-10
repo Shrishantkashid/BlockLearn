@@ -35,6 +35,9 @@ export default function VideoCall({
 }) {
   const navigate = onEndCall;
   
+  // Check if this is a mentor-student session (not an interview)
+  const isMentorStudentSession = !showInterviewDetails;
+
   // Refs
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -701,7 +704,9 @@ export default function VideoCall({
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-white">
-              {userType === 'admin' ? 'Admin Interview Session' : 'Interview Session'}
+              {isMentorStudentSession 
+                ? 'Mentor-Student Session' 
+                : userType === 'admin' ? 'Admin Interview Session' : 'Interview Session'}
             </h1>
             <p className="text-gray-300 text-sm">
               Code: {code}
@@ -757,12 +762,16 @@ export default function VideoCall({
                       )}
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">
-                      {userType === 'admin' ? 'Mentor' : 'Admin'}
+                      {isMentorStudentSession 
+                        ? (userType === 'mentor' ? 'Student' : 'Mentor')
+                        : (userType === 'admin' ? 'Mentor' : 'Admin')}
                     </h3>
                     <p className="text-gray-400 mb-4">
                       {isConnected 
                         ? 'Video feed will appear here' 
-                        : `Waiting for ${userType === 'admin' ? 'mentor' : 'admin'} to join...`}
+                        : isMentorStudentSession
+                          ? `Waiting for ${userType === 'mentor' ? 'student' : 'mentor'} to join...`
+                          : `Waiting for ${userType === 'admin' ? 'mentor' : 'admin'} to join...`}
                     </p>
                   </div>
                 </div>
@@ -785,7 +794,9 @@ export default function VideoCall({
                     </div>
                   )}
                   <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
-                    You ({userType === 'admin' ? 'Admin' : 'Mentor'})
+                    You ({isMentorStudentSession 
+                      ? (userType === 'mentor' ? 'Mentor' : 'Student')
+                      : (userType === 'admin' ? 'Admin' : 'Mentor')})
                   </div>
                 </div>
               </div>
@@ -868,7 +879,11 @@ export default function VideoCall({
                   <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
-                  <span className="text-sm font-medium">You ({userType})</span>
+                  <span className="text-sm font-medium">
+                    You ({isMentorStudentSession 
+                      ? (userType === 'mentor' ? 'Mentor' : 'Student')
+                      : userType})
+                  </span>
                   <div className="ml-auto w-2 h-2 rounded-full bg-green-500"></div>
                 </div>
                 {members.map((memberId, index) => (
@@ -877,7 +892,9 @@ export default function VideoCall({
                       <User className="w-4 h-4 text-white" />
                     </div>
                     <span className="text-sm">
-                      {userType === 'admin' ? 'Mentor' : 'Admin'} {index + 1}
+                      {isMentorStudentSession 
+                        ? (userType === 'mentor' ? 'Student' : 'Mentor')
+                        : (userType === 'admin' ? 'Mentor' : 'Admin')} {index + 1}
                     </span>
                     <div className="ml-auto w-2 h-2 rounded-full bg-green-500"></div>
                   </div>
@@ -893,7 +910,9 @@ export default function VideoCall({
                   <div className="flex items-center space-x-2">
                     <User className="w-4 h-4 text-gray-400" />
                     <span className="text-sm">
-                      {userType === 'admin' ? 'Interview Candidate' : 'Interviewer'}
+                      {isMentorStudentSession
+                        ? (userType === 'mentor' ? 'Session Participant' : 'Session Host')
+                        : (userType === 'admin' ? 'Interview Candidate' : 'Interviewer')}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -906,20 +925,23 @@ export default function VideoCall({
                   </div>
                 </div>
                 
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium mb-2">Skills to Demonstrate</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
-                      JavaScript
-                    </span>
-                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
-                      React
-                    </span>
-                    <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
-                      Node.js
-                    </span>
+                {!isMentorStudentSession && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-medium mb-2">Skills to Demonstrate</h3>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
+                        JavaScript
+                      </span>
+                      <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
+                        React
+                      </span>
+                      <span className="px-2 py-1 bg-primary/20 text-primary text-xs rounded-full">
+                        Node.js
+                      </span>
+                    </div>
                   </div>
-                </div>
+                )}
+
               </div>
             )}
             

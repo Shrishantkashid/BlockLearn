@@ -5,7 +5,7 @@ import api from "../api";
 import FeedbackModal from "../components/FeedbackModal";
 import LiveSessionModal from "../components/LiveSessionModal";
 import LiveSessionCode from "../components/LiveSessionCode";
-import SessionSchedulingChat from "../components/SessionSchedulingChat";
+import MutualSessionBooking from "../components/MutualSessionBooking";
 
 const Sessions = () => {
   const [sessions, setSessions] = useState({
@@ -193,6 +193,13 @@ const Sessions = () => {
                 {session.duration_minutes} minutes
               </span>
             </div>
+            {session.live_session_code && (
+              <div className="mt-2 text-sm">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
+                  Video Call Code: {session.live_session_code}
+                </span>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
@@ -213,13 +220,23 @@ const Sessions = () => {
             </>
           ) : (
             <>
-              <button
-                onClick={() => openLiveSessionModal(session)}
-                className="btn-primary flex items-center"
-              >
-                <Video className="w-4 h-4 mr-2" />
-                Start Live Session
-              </button>
+              {session.live_session_code ? (
+                <Link
+                  to={`/mentor-student-call?roomId=session_${session.id}&userType=student`}
+                  className="btn-primary flex items-center"
+                >
+                  <Video className="w-4 h-4 mr-2" />
+                  Join Video Call
+                </Link>
+              ) : (
+                <button
+                  onClick={() => openLiveSessionModal(session)}
+                  className="btn-primary flex items-center"
+                >
+                  <Video className="w-4 h-4 mr-2" />
+                  Start Live Session
+                </button>
+              )}
             </>
           )}
         </div>
@@ -237,137 +254,149 @@ const Sessions = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">My Sessions</h1>
-          <p className="text-gray-600 dark:text-slate-400">
-            Manage your upcoming and completed learning sessions
-          </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your Sessions</h1>
+            <p className="mt-2 text-gray-600 dark:text-slate-400">
+              Manage your upcoming and past sessions
+            </p>
+          </div>
+          <div className="mt-4 md:mt-0">
+            <Link
+              to="/learner/session-booking"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Book New Session
+            </Link>
+          </div>
         </div>
 
-        {showSchedulingChat && selectedMentor && selectedSkill && (
-          <div className="mb-8">
-            <SessionSchedulingChat
-              mentor={selectedMentor}
-              student={{}} // Will be filled from auth context
-              skill={selectedSkill}
-              onSessionScheduled={handleSessionScheduled}
-            />
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-        )}
-
-        {generatedLiveSession && (
-          <div className="mb-8">
-            <LiveSessionCode 
-              liveSessionData={generatedLiveSession} 
-              onJoinSession={handleJoinLiveSession}
-            />
-          </div>
-        )}
-
-        <div className="space-y-8">
-          {/* Schedule New Session - Only show when not in chat mode */}
-          {!showSchedulingChat && (
+        ) : (
+          <div className="space-y-8">
+            {/* Upcoming Sessions */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
-                  <Calendar className="w-5 h-5 mr-2 text-blue-500" />
-                  Schedule New Session
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Upcoming Sessions
                 </h2>
               </div>
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-                <p className="text-gray-600 dark:text-slate-400 mb-4">
-                  You can schedule sessions with mentors who have accepted your connection requests.
-                  Please check your mentor connection status in your dashboard to see which mentors
-                  have accepted your requests.
-                </p>
-                <Link
-                  to="/learner/dashboard"
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none"
+              
+              {sessions.upcoming.length === 0 ? (
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-8 text-center">
+                  <Calendar className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No upcoming sessions</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                    Get started by booking a session with a mentor.
+                  </p>
+                  <div className="mt-6">
+                    <Link
+                      to="/learner/session-booking"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
+                    >
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Book Your First Session
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {sessions.upcoming.map(renderSessionCard)}
+                </div>
+              )}
+            </div>
+
+            {/* Completed Sessions */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Completed Sessions
+                </h2>
+              </div>
+              
+              {sessions.completed.length === 0 ? (
+                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-8 text-center">
+                  <CheckCircle className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No completed sessions</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                    Your completed sessions will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {sessions.completed.map(renderSessionCard)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Feedback Modal */}
+        {feedbackModal.isOpen && (
+          <FeedbackModal
+            isOpen={feedbackModal.isOpen}
+            onClose={closeFeedbackModal}
+            sessionId={feedbackModal.sessionId}
+            userRole={feedbackModal.userRole}
+            existingFeedback={feedbackModal.existingFeedback}
+            onSubmit={handleFeedbackSubmit}
+          />
+        )}
+
+        {/* Live Session Modal */}
+        {liveSessionModal.isOpen && (
+          <LiveSessionModal
+            isOpen={liveSessionModal.isOpen}
+            onClose={closeLiveSessionModal}
+            session={liveSessionModal.session}
+            onCodeGenerated={handleLiveSessionCodeGenerated}
+          />
+        )}
+
+        {/* Generated Live Session Code */}
+        {generatedLiveSession && (
+          <LiveSessionCode
+            liveSessionData={generatedLiveSession}
+            onJoinSession={handleJoinLiveSession}
+            onDismiss={() => setGeneratedLiveSession(null)}
+          />
+        )}
+
+        {/* Session Scheduling Chat */}
+        {showSchedulingChat && selectedMentor && selectedSkill && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+              <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Schedule Session with {selectedMentor.first_name} {selectedMentor.last_name}
+                </h3>
+                <button
+                  onClick={() => setShowSchedulingChat(false)}
+                  className="text-gray-400 hover:text-gray-500 dark:text-slate-400 dark:hover:text-slate-300"
                 >
-                  Check Mentor Connections
-                </Link>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4 overflow-y-auto max-h-[70vh]">
+                <MutualSessionBooking
+                  mentor={selectedMentor}
+                  student={JSON.parse(localStorage.getItem('userData') || '{}')}
+                  skill={selectedSkill}
+                  currentUser={JSON.parse(localStorage.getItem('userData') || '{}')}
+                  onSessionScheduled={handleSessionScheduled}
+                />
               </div>
             </div>
-          )}
-
-          {/* Upcoming Sessions */}
-          <div>
-            <div className="flex items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
-                <Calendar className="w-5 h-5 mr-2 text-blue-500" />
-                Upcoming Sessions
-              </h2>
-              <span className="ml-2 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                {sessions.upcoming.length}
-              </span>
-            </div>
-            
-            {sessions.upcoming.length > 0 ? (
-              <div className="space-y-4">
-                {sessions.upcoming.map(renderSessionCard)}
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-8 text-center">
-                <Calendar className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No upcoming sessions</h3>
-                <p className="text-gray-500 dark:text-slate-400">
-                  You don't have any scheduled sessions yet.
-                </p>
-              </div>
-            )}
           </div>
-
-          {/* Completed Sessions */}
-          <div>
-            <div className="flex items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
-                <CheckCircle className="w-5 h-5 mr-2 text-green-500" />
-                Completed Sessions
-              </h2>
-              <span className="ml-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                {sessions.completed.length}
-              </span>
-            </div>
-            
-            {sessions.completed.length > 0 ? (
-              <div className="space-y-4">
-                {sessions.completed.map(renderSessionCard)}
-              </div>
-            ) : (
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-8 text-center">
-                <CheckCircle className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No completed sessions</h3>
-                <p className="text-gray-500 dark:text-slate-400">
-                  Your completed sessions will appear here.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
-
-      {/* Feedback Modal */}
-      {feedbackModal.isOpen && (
-        <FeedbackModal
-          isOpen={feedbackModal.isOpen}
-          onClose={closeFeedbackModal}
-          sessionId={feedbackModal.sessionId}
-          userRole={feedbackModal.userRole}
-          existingFeedback={feedbackModal.existingFeedback}
-          onSubmit={handleFeedbackSubmit}
-        />
-      )}
-
-      {/* Live Session Modal */}
-      {liveSessionModal.isOpen && (
-        <LiveSessionModal
-          isOpen={liveSessionModal.isOpen}
-          onClose={closeLiveSessionModal}
-          session={liveSessionModal.session}
-          onCodeGenerated={handleLiveSessionCodeGenerated}
-        />
-      )}
     </div>
   );
 };

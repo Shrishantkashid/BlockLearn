@@ -83,7 +83,7 @@ const MentorSessions = () => {
               </p>
             </div>
             <button
-              onClick={() => navigate('/match')}
+              onClick={() => navigate('/mentor/session-booking')}
               className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
               Schedule New Session
@@ -153,10 +153,10 @@ const MentorSessions = () => {
                 : `You don't have any ${filter} sessions.`}
             </p>
             <button
-              onClick={() => navigate('/match')}
+              onClick={() => navigate('/mentor/session-booking')}
               className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
             >
-              Find Students to Mentor
+              Schedule New Session
             </button>
           </div>
         ) : (
@@ -229,13 +229,26 @@ const MentorSessions = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {session.status === 'scheduled' && session.meeting_link && (
-                          <a
-                            href={session.meeting_link}
-                            className="text-primary hover:text-primary/80"
-                          >
-                            Join Session
-                          </a>
+                        {session.status === 'scheduled' && (
+                          <>
+                            {session.live_session_code ? (
+                              <a
+                                href={`/mentor-student-call?roomId=session_${session.id}&userType=mentor`}
+                                className="text-primary hover:text-primary/80"
+                              >
+                                Join Video Call
+                              </a>
+                            ) : session.meeting_link ? (
+                              <a
+                                href={session.meeting_link}
+                                className="text-primary hover:text-primary/80"
+                              >
+                                Join Session
+                              </a>
+                            ) : (
+                              <span className="text-gray-500 dark:text-slate-400">No meeting link</span>
+                            )}
+                          </>
                         )}
                         {session.status === 'completed' && (
                           <span className="text-green-600 dark:text-green-400">Completed</span>

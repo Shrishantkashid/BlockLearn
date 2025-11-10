@@ -89,6 +89,7 @@ router.post("/", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const {
+      student_id,
       mentor_id,
       skill_id,
       scheduled_at,
@@ -105,6 +106,21 @@ router.post("/", authenticateToken, async (req, res) => {
       });
     }
 
+    // Additional validation for field types
+    if (typeof mentor_id !== 'string' || mentor_id.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid mentor ID"
+      });
+    }
+    
+    if (typeof skill_id !== 'string' || skill_id.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid skill ID"
+      });
+    }
+
     // Get database connection
     const db = await connectDB();
     const usersCollection = db.collection('users');
@@ -112,11 +128,15 @@ router.post("/", authenticateToken, async (req, res) => {
     const sessionsCollection = db.collection('sessions');
     const userSkillsCollection = db.collection('user_skills');
 
+    // Convert string IDs to ObjectId if needed
+    const mentorIdObj = typeof mentor_id === 'string' ? new ObjectId(mentor_id) : mentor_id;
+    const skillIdObj = typeof skill_id === 'string' ? new ObjectId(skill_id) : skill_id;
+
     // Verify the mentor exists and offers the requested skill
-    const mentor = await usersCollection.findOne({ _id: mentor_id });
+    const mentor = await usersCollection.findOne({ _id: mentorIdObj });
     const mentorSkill = await userSkillsCollection.findOne({ 
-      user_id: mentor_id, 
-      skill_id: skill_id, 
+      user_id: mentorIdObj, 
+      skill_id: skillIdObj, 
       skill_type: 'offered' 
     });
 
@@ -128,7 +148,7 @@ router.post("/", authenticateToken, async (req, res) => {
     }
 
     // Verify the skill exists
-    const skill = await skillsCollection.findOne({ _id: skill_id });
+    const skill = await skillsCollection.findOne({ _id: skillIdObj });
 
     if (!skill) {
       return res.status(400).json({
@@ -137,16 +157,42 @@ router.post("/", authenticateToken, async (req, res) => {
       });
     }
 
-    // Create the session
+    // Validate datetime format
+    const scheduledDate = new Date(scheduled_at);
+    if (isNaN(scheduledDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid scheduled time format"
+      });
+    }
+
+    // Generate unique random code for the live session
+    const generateUniqueCode = () => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = '';
+      for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return code;
+    };
+
+    const liveSessionCode = generateUniqueCode();
+
+    // Determine student_id - use provided student_id or default to current user
+    const studentId = student_id || userId;
+
+    // Create the session with live session code
     const newSession = {
-      student_id: userId,
-      mentor_id: mentor_id,
-      skill_id: skill_id,
-      scheduled_at: new Date(scheduled_at),
-      duration_minutes: duration_minutes,
+      student_id: studentId,
+      mentor_id: mentorIdObj,
+      skill_id: skillIdObj,
+      scheduled_at: scheduledDate,
+      duration_minutes: duration_minutes || 60, // Default to 60 minutes
       status: 'scheduled',
       meeting_link: meeting_link,
-      location: location,
+      location: location || 'Online', // Default to 'Online' if not provided
+      live_session_code: liveSessionCode,
+      live_session_created_at: new Date(),
       notes: notes,
       created_at: new Date(),
       updated_at: new Date()
@@ -158,11 +204,14 @@ router.post("/", authenticateToken, async (req, res) => {
     // Record session outcome (initially connected = true since session was created)
     await MatchingService.recordSessionOutcome(session._id, true);
 
-    // Send email notifications to both learner and mentor
+    // Send email notifications to both learner and mentor with video call details
     try {
+      // Get student info for email
+      const student = await usersCollection.findOne({ _id: studentId });
+      
       await sendSessionScheduledEmail(
-        req.user.email,
-        req.user.first_name,
+        student.email,
+        student.first_name,
         mentor.email,
         mentor.first_name,
         {
@@ -170,7 +219,9 @@ router.post("/", authenticateToken, async (req, res) => {
           scheduledAt: session.scheduled_at,
           durationMinutes: session.duration_minutes,
           location: session.location,
-          notes: session.notes
+          notes: session.notes,
+          liveSessionCode: session.live_session_code,
+          meetingLink: `http://localhost:5173/session/live/${session.live_session_code}`
         }
       );
     } catch (emailError) {
@@ -188,11 +239,12 @@ router.post("/", authenticateToken, async (req, res) => {
         status: session.status,
         meeting_link: session.meeting_link,
         location: session.location,
+        live_session_code: session.live_session_code,
         notes: session.notes,
         created_at: session.created_at,
         updated_at: session.updated_at,
         student: {
-          id: userId,
+          id: studentId,
           first_name: req.user.first_name,
           last_name: req.user.last_name,
           email: req.user.email
@@ -232,7 +284,7 @@ router.get("/:session_id", authenticateToken, async (req, res) => {
     const skillsCollection = db.collection('skills');
     
     // Convert session_id to ObjectId if it's a string
-    const sessionIdObj = typeof session_id === 'string' ? session_id : session_id;
+    const sessionIdObj = typeof session_id === 'string' ? new ObjectId(session_id) : session_id;
 
     // Find session where user is either student or mentor
     const session = await sessionsCollection.findOne({
@@ -268,6 +320,7 @@ router.get("/:session_id", authenticateToken, async (req, res) => {
         status: session.status,
         meeting_link: session.meeting_link,
         location: session.location,
+        live_session_code: session.live_session_code,
         notes: session.notes,
         created_at: session.created_at,
         updated_at: session.updated_at,
@@ -317,9 +370,12 @@ router.post("/generate-live-code", authenticateToken, async (req, res) => {
     const db = await connectDB();
     const sessionsCollection = db.collection('sessions');
     
+    // Convert session_id to ObjectId if it's a string
+    const sessionIdObj = typeof session_id === 'string' ? new ObjectId(session_id) : session_id;
+    
     // Verify the session exists and the user is part of it
     const session = await sessionsCollection.findOne({
-      _id: session_id,
+      _id: sessionIdObj,
       $or: [
         { student_id: userId },
         { mentor_id: userId }
@@ -347,7 +403,7 @@ router.post("/generate-live-code", authenticateToken, async (req, res) => {
 
     // Store the live session code in the session
     await sessionsCollection.updateOne(
-      { _id: session_id },
+      { _id: sessionIdObj },
       { 
         $set: { 
           live_session_code: liveSessionCode,
