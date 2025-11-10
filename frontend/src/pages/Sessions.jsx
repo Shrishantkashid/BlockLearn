@@ -6,6 +6,7 @@ import FeedbackModal from "../components/FeedbackModal";
 import LiveSessionModal from "../components/LiveSessionModal";
 import LiveSessionCode from "../components/LiveSessionCode";
 import MutualSessionBooking from "../components/MutualSessionBooking";
+import io from 'socket.io-client';
 
 const Sessions = () => {
   const [sessions, setSessions] = useState({
@@ -30,13 +31,28 @@ const Sessions = () => {
   const [preSelectedMentor, setPreSelectedMentor] = useState(null);
   const [preSelectedSkill, setPreSelectedSkill] = useState(null);
   const navigate = useNavigate();
+  const [socket, setSocket] = useState(null);
 
   useEffect(() => {
     fetchUserSessions();
     
-    // Check if there's a pre-selected mentor from navigation state
-    // In a real implementation, this would come from navigation state
-    // For now, we'll just show the scheduling section by default if there are no sessions
+    // Initialize socket connection
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+    
+    // Listen for session scheduled events
+    newSocket.on('session-scheduled', (data) => {
+      console.log('Session scheduled event received:', data);
+      // Refresh sessions list when a session is scheduled
+      fetchUserSessions();
+    });
+    
+    // Clean up socket connection
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
   }, []);
 
   const fetchUserSessions = async () => {
@@ -222,7 +238,7 @@ const Sessions = () => {
             <>
               {session.live_session_code ? (
                 <Link
-                  to={`/mentor-student-call?roomId=session_${session.id}&userType=student`}
+                  to={`/mentor-student-call?roomId=${session.live_session_code}&userType=student`}
                   className="btn-primary flex items-center"
                 >
                   <Video className="w-4 h-4 mr-2" />
@@ -237,6 +253,7 @@ const Sessions = () => {
                   Start Live Session
                 </button>
               )}
+
             </>
           )}
         </div>

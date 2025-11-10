@@ -29,7 +29,13 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
   // Initialize socket connection
   useEffect(() => {
     // Create a unique room ID based on the session ID
-    const roomId = `session_${sessionId || 'new'}`;
+    const roomId = sessionId || `session_${mentor.id}_${student.id}_${skill.id}`;
+    
+    console.log('Joining room:', roomId);
+    console.log('Current user:', currentUser);
+    console.log('Mentor:', mentor);
+    console.log('Student:', student);
+    console.log('Skill:', skill);
     
     // Connect to the signaling server
     socketRef.current = io('http://localhost:5000', {
@@ -46,8 +52,19 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
     // Handle connection
     socketRef.current.on('connect', () => {
       console.log('Connected to Socket.IO server with ID:', socketRef.current.id);
+      console.log('Joining room with ID:', roomId);
       // Join the session room
       socketRef.current.emit('join-room', roomId);
+    });
+
+    // Handle connection error
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    // Handle disconnect
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
     });
 
     // Handle incoming messages
@@ -182,6 +199,9 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
     e.preventDefault();
     if (!newMessage.trim()) return;
 
+    // Create a unique room ID based on the session ID
+    const roomId = sessionId || `session_${mentor.id}_${student.id}_${skill.id}`;
+    
     // Determine sender type
     const senderType = currentUser.id === mentor.id ? 'mentor' : 'learner';
     
@@ -189,7 +209,7 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
     const messageData = {
       message: newMessage,
       senderType: senderType,
-      roomId: `session_${sessionId || 'new'}`,
+      roomId: roomId, // Use the deterministic room ID
       timestamp: new Date().toISOString()
     };
 
@@ -214,6 +234,9 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
   };
 
   const handleProposeTime = (dateTime) => {
+    // Create a unique room ID based on the session ID
+    const roomId = sessionId || `session_${mentor.id}_${student.id}_${skill.id}`;
+    
     // Determine proposer type
     const proposerType = currentUser.id === mentor.id ? 'mentor' : 'learner';
     
@@ -221,7 +244,7 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
     const proposalData = {
       proposerType: proposerType,
       dateTime: dateTime,
-      roomId: `session_${sessionId || 'new'}`,
+      roomId: roomId, // Use the deterministic room ID
       timestamp: new Date().toISOString()
     };
 
@@ -256,6 +279,9 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
   };
 
   const handleProposalResponse = (proposalId, response) => {
+    // Create a unique room ID based on the session ID
+    const roomId = sessionId || `session_${mentor.id}_${student.id}_${skill.id}`;
+    
     // Determine responder type
     const responderType = currentUser.id === mentor.id ? 'mentor' : 'learner';
     
@@ -279,7 +305,7 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
       response: response, // 'accepted' or 'rejected'
       responderType: responderType,
       dateTime: proposal.dateTime,
-      roomId: `session_${sessionId || 'new'}`,
+      roomId: roomId, // Use the deterministic room ID
       timestamp: new Date().toISOString()
     };
 
@@ -304,6 +330,9 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
 
   const autoScheduleSession = async (scheduledDateTime) => {
     try {
+      // Create a unique room ID based on the session ID
+      const roomId = sessionId || `session_${mentor.id}_${student.id}_${skill.id}`;
+      
       // Format the datetime for better compatibility
       // Use ISO format without milliseconds and timezone for better compatibility
       const scheduledDate = new Date(scheduledDateTime);
@@ -330,7 +359,7 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
             duration_minutes: 60,
             location: 'Online',
             notes: `Session automatically scheduled from accepted proposal on ${scheduledDate.toLocaleString()}`,
-            roomId: `session_${sessionId || 'new'}`,
+            roomId: roomId, // Use the deterministic room ID
             live_session_code: response.data.data.live_session_code,
             meeting_link: response.data.data.meeting_link
           };

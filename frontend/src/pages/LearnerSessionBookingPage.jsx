@@ -86,6 +86,12 @@ const LearnerSessionBookingPage = () => {
       // Session has been created in the database and emails sent
       // The success message is shown in the UI
       console.log('Session scheduled:', sessionData);
+      
+      // Automatically navigate back to sessions page after a short delay
+      // This will trigger a fresh load of the sessions list
+      setTimeout(() => {
+        navigate('/sessions');
+      }, 3000);
     } catch (err) {
       console.error('Error scheduling session:', err);
       alert('There was an error scheduling the session. Please try again.');
@@ -254,9 +260,13 @@ const LearnerSessionBookingPage = () => {
               <button
                 onClick={() => {
                   if (selectedMentor && selectedSkill) {
+                    // Generate a deterministic session ID based on mentor and student IDs
+                    // This ensures both users join the same room
+                    const deterministicId = `session_${selectedMentor.id}_${currentUser.id}_${selectedSkill.id}`;
+                    
                     // Create a temporary session object for the booking component
                     const tempSession = {
-                      id: 'new',
+                      id: deterministicId,
                       mentor: selectedMentor,
                       student: currentUser,
                       skill: selectedSkill

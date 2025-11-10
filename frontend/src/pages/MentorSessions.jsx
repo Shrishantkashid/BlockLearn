@@ -1,16 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Calendar, Clock, CheckCircle, XCircle, User } from 'lucide-react';
 import api from '../api';
-import { Calendar, Clock, User, Award, XCircle, CheckCircle } from 'lucide-react';
+import io from 'socket.io-client';
 
 const MentorSessions = () => {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const navigate = useNavigate();
+  const [socket, setSocket] = useState(null);
 
   useEffect(() => {
     fetchSessions();
+    
+    // Initialize socket connection
+    const newSocket = io('http://localhost:5000');
+    setSocket(newSocket);
+    
+    // Listen for session scheduled events
+    newSocket.on('session-scheduled', (data) => {
+      console.log('Session scheduled event received:', data);
+      // Refresh sessions list when a session is scheduled
+      fetchSessions();
+    });
+    
+    // Clean up socket connection
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
   }, []);
 
   const fetchSessions = async () => {
@@ -233,7 +253,7 @@ const MentorSessions = () => {
                           <>
                             {session.live_session_code ? (
                               <a
-                                href={`/mentor-student-call?roomId=session_${session.id}&userType=mentor`}
+                                href={`/mentor-student-call?roomId=${session.live_session_code}&userType=mentor`}
                                 className="text-primary hover:text-primary/80"
                               >
                                 Join Video Call
