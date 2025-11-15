@@ -4,7 +4,7 @@ title Start Mini Project
 REM -------------------------
 REM Backend Setup
 REM -------------------------
-cd C:\Users\shank\OneDrive\Desktop\Mini Project\Blocklearn\backend
+cd C:\Users\SHRI\Desktop\BlockLearn\backend
 
 echo Checking backend dependencies...
 if not exist node_modules (
@@ -15,12 +15,12 @@ if not exist node_modules (
 )
 
 echo Starting Backend server...
-start cmd /k "cd C:\Users\shank\OneDrive\Desktop\Mini Project\Blocklearn\backend && npm run dev"
+start cmd /k "cd C:\Users\SHRI\Desktop\BlockLearn\backend && npm run dev"
 
 REM -------------------------
 REM Frontend Setup
 REM -------------------------
-cd C:\Users\shank\OneDrive\Desktop\Mini Project\Blocklearn\frontend
+cd C:\Users\SHRI\Desktop\BlockLearn\frontend
 echo Checking frontend dependencies...
 if not exist node_modules (
     echo Installing frontend dependencies...
@@ -30,7 +30,7 @@ if not exist node_modules (
 )
 
 echo Starting Frontend server...
-start cmd /k "cd C:\Users\shank\OneDrive\Desktop\Mini Project\Blocklearn\frontend && npm run dev"
+start cmd /k "cd C:\Users\SHRI\Desktop\BlockLearn\frontend && npm run dev"
 
 echo Both servers are starting...
 pause
