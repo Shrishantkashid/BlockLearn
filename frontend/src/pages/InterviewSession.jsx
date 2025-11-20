@@ -467,35 +467,25 @@ export default function InterviewSession() {
   };
 
   const endCall = () => {
-    // Clean up WebRTC connection
-    if (peer && peer.peer) {
-      try {
-        peer.peer.close();
-      } catch (e) {
-        console.log('Error closing peer connection:', e);
-      }
-    }
-    
-    if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-    }
-    
+    closeConnection(peerConnectionRef.current, localStream);
+
     if (socketRef.current) {
+      socketRef.current.emit('leave-room', code);
       socketRef.current.disconnect();
     }
-    
     navigate('/dashboard');
   };
 
   const sendMessage = () => {
-    // For now, we'll just add to local messages since we don't have a chat server
-    if (newMessage.trim()) {
+    if (newMessage.trim() && socketRef.current) {
       const messageData = {
         text: newMessage,
-        sender: "You",
+        sender: socketRef.current.id,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
-      
+
+      socketRef.current.emit('message', { roomId: code, message: messageData });
+
       setMessages(prev => [...prev, {
         id: Date.now(),
         text: newMessage,
@@ -503,7 +493,7 @@ export default function InterviewSession() {
         timestamp: messageData.timestamp,
         isOwn: true
       }]);
-      
+
       setNewMessage("");
     }
   };
