@@ -111,81 +111,160 @@ export default function AdminInterviewSession() {
   }, []);
 
   const initializeSocket = () => {
-    // Connect to the React-webRTC signaling server with better error handling
-    socketRef.current = io("http://localhost:8000", {
+    // Determine the backend URL based on environment
+    const backendUrl = import.meta.env.VITE_API_URL ||
+                      (window.location.hostname.includes('vercel.app')
+                        ? `https://${window.location.hostname}`
+                        : 'http://localhost:5000');
+
+    console.log('Connecting to signaling server at:', backendUrl);
+
+    // Connect to the unified signaling server with improved configuration
+    socketRef.current = io(backendUrl, {
       transports: ['websocket', 'polling'],
-      withCredentials: false,
+      withCredentials: true,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 15,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       randomizationFactor: 0.5,
-      timeout: 10000,
+      timeout: 20000,
+      path: '/socket.io',
+      upgrade: false,
+      rememberUpgrade: false,
+      forceNew: true,
+      rejectUnauthorized: false
     });
 
-    socketRef.current.on("connect", () => {
-      console.log(`Socket Connected`, socketRef.current.id);
-      // Join the room with the interview code
-      socketRef.current.emit("room:join", { email: "admin@" + code, room: code });
+    socketRef.current.on('connect', () => {
+      console.log('Connected to signaling server with ID:', socketRef.current.id);
+      socketRef.current.emit('join-room', code);
     });
 
-    socketRef.current.on("room:join", (data) => {
-      console.log("Room joined", data);
-      showNotificationPopup('Joined interview room');
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      setError('Failed to connect to signaling server. Please try again.');
     });
 
-    socketRef.current.on("user:joined", ({ email, id }) => {
-      console.log(`User ${email} joined room with id ${id}`);
-      showNotificationPopup(`${email} joined the room`);
-      setRemoteSocketId(id);
-      
-      // If we have a local stream, initiate a call after a short delay
-      // If we don't have a local stream yet, the initializeMedia function will handle it
-      if (localStream) {
-        console.log("Initiating call to newly joined user");
-        setTimeout(() => {
-          handleCallUser();
-        }, 1500);
-      } else {
-        console.log("Local stream not ready yet, will call when ready");
+    // Handle offer from mentor
+    socketRef.current.on('offer', async (data) => {
+      console.log('Received offer:', data);
+      try {
+        setCaller(data.sender); // Set the caller to the sender of the offer
+        setIsCalling(true);
+
+        if (peerConnectionRef.current) {
+          console.log('Creating answer for offer from:', data.sender);
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await peerConnectionRef.current.createAnswer();
+          await peerConnectionRef.current.setLocalDescription(answer);
+
+          if (socketRef.current) {
+            socketRef.current.emit('answer', {
+              roomId: code,
+              answer: answer
+            });
+            console.log('Answer broadcast to room for admin-mentor call');
+          }
+        }
+      } catch (error) {
+        handleWebRTCError(error, 'handling offer');
       }
     });
 
-    socketRef.current.on("incomming:call", ({ from, offer }) => {
-      console.log("Incoming call from", from, "with offer", offer);
-      setRemoteSocketId(from);
-      
-      // Handle incoming call
-      handleIncomingCall({ from, offer });
+    // Handle answer from mentor
+    socketRef.current.on('answer', async (data) => {
+      console.log('Received answer:', data);
+      if (peerConnectionRef.current) {
+        try {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+          setCallAccepted(true);
+          setIsConnected(true);
+          showNotificationPopup('Mentor joined the interview session');
+          setOtherParticipant(prev => ({ ...prev, hasVideo: true }));
+          console.log('Answer received and processed, isConnected set to true');
+
+          if (remoteVideoRef.current && Object.keys(remoteStreams).length > 0) {
+            remoteVideoRef.current.play().catch(error => {
+              console.log('Auto-play prevented for remote video:', error);
+            });
+          }
+        } catch (error) {
+          handleWebRTCError(error, 'handling answer');
+        }
+      }
     });
 
-    socketRef.current.on("call:accepted", ({ from, ans }) => {
-      console.log("Call accepted by", from, "with answer", ans);
-      console.log("Setting local description with answer");
-      peer.setLocalDescription(ans);
-      setIsConnected(true);
-      showNotificationPopup('Call connected');
-      
-      // Send our stream
-      console.log("Sending streams after call acceptance");
+    // Handle ICE candidate
+    socketRef.current.on('ice-candidate', async (data) => {
+      console.log('Received ICE candidate:', data);
+      if (peerConnectionRef.current && data.candidate) {
+        try {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (error) {
+          handleWebRTCError(error, 'adding ICE candidate');
+        }
+      }
+    });
+
+    // Handle mentor joined
+    socketRef.current.on('user-joined', (userId) => {
+      console.log('Mentor joined:', userId);
+      setMembers(prev => {
+        if (!prev.includes(userId)) {
+          return [...prev, userId];
+        }
+        return prev;
+      });
+
+      showNotificationPopup('Mentor joined the room');
+
+      // Update connection status if we have remote streams
+      if (Object.keys(remoteStreams).length > 0) {
+        setIsConnected(true);
+      }
+
+      // Create offer immediately when mentor joins (admin-mentor 1-on-1 logic)
+      console.log('Admin-mentor call detected, creating offer immediately for user:', userId);
       setTimeout(() => {
-        sendStreams();
-      }, 1000);
+        if (isComponentMountedRef.current && localStream && peerConnectionRef.current) {
+          createOffer(userId);
+        }
+      }, 500);
     });
 
-    socketRef.current.on("peer:nego:needed", ({ from, offer }) => {
-      console.log("Peer negotiation needed from", from, "with offer", offer);
-      handlePeerNegotiationNeeded({ from, offer });
+    // Handle mentor left
+    socketRef.current.on('user-left', (userId) => {
+      console.log('Mentor left:', userId);
+      setIsConnected(false);
+      setCallAccepted(false);
+      setIsCalling(false);
+      setRemoteStreams(prev => {
+        const newStreams = { ...prev };
+        delete newStreams['remote']; // Remove the remote stream
+        return newStreams;
+      });
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
+      }
+      showNotificationPopup('Mentor left the room');
+      setOtherParticipant(prev => ({ ...prev, hasVideo: false }));
+      setMembers(prev => prev.filter(member => member !== userId));
+      console.log('Mentor left, isConnected set to false');
     });
 
-    socketRef.current.on("peer:nego:final", ({ from, ans }) => {
-      console.log("Peer negotiation final from", from, "with answer", ans);
-      peer.setLocalDescription(ans);
-    });
-
-    socketRef.current.on("connect_error", (error) => {
-      console.error('Socket connection error:', error);
-      setError('Failed to connect to signaling server. Please make sure the React-webRTC server is running on port 8000.');
+    // Handle chat messages
+    socketRef.current.on('message', (data) => {
+      console.log('Received message:', data);
+      if (data && data.message) {
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          text: data.message.text || '',
+          sender: data.sender || data.message.sender || '',
+          timestamp: data.message.timestamp || new Date().toLocaleTimeString(),
+          isOwn: (data.sender || data.message.sender) === socketRef.current.id
+        }]);
+      }
     });
   };
 
