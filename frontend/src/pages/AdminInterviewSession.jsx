@@ -1,7 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import io from "socket.io-client";
-import peer from "../services/peer"; // We'll create this service
+import {
+  isWebRTCSupported,
+  getMediaConstraints,
+  createPeerConnection,
+  addStreamToPeerConnection,
+  handleWebRTCError,
+  closeConnection
+} from "../utils/webrtcUtils";
 import { 
   Phone, 
   Video, 
