@@ -513,6 +513,22 @@ export default function InterviewSession() {
     }
   }, [messages]);
 
+  // Update remote video when remoteStreams changes
+  useEffect(() => {
+    if (remoteVideoRef.current) {
+      if (Object.keys(remoteStreams).length > 0) {
+        // Set the remote video srcObject to the remote stream
+        const remoteStream = remoteStreams['remote'];
+        remoteVideoRef.current.srcObject = remoteStream;
+        remoteVideoRef.current.play().catch(error => {
+          console.log('Auto-play prevented for remote video:', error);
+        });
+      } else {
+        remoteVideoRef.current.srcObject = null;
+      }
+    }
+  }, [remoteStreams]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
