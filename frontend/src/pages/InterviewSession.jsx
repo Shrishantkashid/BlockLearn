@@ -403,116 +403,41 @@ export default function InterviewSession() {
     }
   };
 
-  const handleCallUser = useCallback(async () => {
-    if (!remoteSocketId || !localStream) {
-      console.log("Cannot call user: missing remoteSocketId or localStream");
+  const createOffer = async (targetUserId) => {
+    if (!isComponentMountedRef.current) {
+      console.log('Component unmounted, skipping offer creation');
       return;
     }
-    
-    console.log("Calling user", remoteSocketId);
-    try {
-      console.log("Creating offer");
-      const offer = await peer.getOffer();
-      console.log("Sending offer to", remoteSocketId);
-      socketRef.current.emit("user:call", { to: remoteSocketId, offer });
-    } catch (error) {
-      console.error("Error creating offer:", error);
-    }
-  }, [remoteSocketId, localStream]);
 
-  const handleIncomingCall = useCallback(async ({ from, offer }) => {
-    setRemoteSocketId(from);
-    
-    // Only get media stream if we don't have one yet
-    let stream = localStream;
-    if (!stream) {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-      
-      setLocalStream(stream);
-      
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.play().catch(error => {
-          console.log('Auto-play prevented for local video:', error);
+    if (!peerConnectionRef.current) {
+      console.log('Peer connection not ready yet');
+      return;
+    }
+
+    if (peerConnectionRef.current.localDescription) {
+      console.log('Local description already exists, skipping offer creation');
+      return;
+    }
+
+    try {
+      console.log('Creating offer for:', targetUserId);
+      const offer = await peerConnectionRef.current.createOffer();
+      await peerConnectionRef.current.setLocalDescription(offer);
+
+      if (socketRef.current) {
+        // Broadcast offer to room for admin-mentor calls
+        socketRef.current.emit('offer', {
+          roomId: code,
+          offer: offer
         });
+        console.log('Offer broadcast to room for admin-mentor call');
       }
-    }
-    
-    console.log(`Incoming Call`, from, offer);
-    const ans = await peer.getAnswer(offer);
-    socketRef.current.emit("call:accepted", { to: from, ans });
-    
-    // Send our streams after accepting the call
-    setTimeout(() => {
-      sendStreams();
-    }, 1000);
-  }, [localStream]);
-
-  const sendStreams = useCallback(() => {
-    if (!localStream || !peer || !peer.peer) {
-      console.log("Cannot send streams: missing localStream or peer connection");
-      return;
-    }
-    
-    console.log("Sending streams to peer connection");
-    try {
-      for (const track of localStream.getTracks()) {
-        peer.peer.addTrack(track, localStream);
-      }
-      console.log("Streams sent successfully");
     } catch (error) {
-      console.error("Error sending streams:", error);
-    }
-  }, [localStream]);
-
-  const handlePeerNegotiationNeeded = useCallback(async () => {
-    if (!remoteSocketId) return;
-    
-    const offer = await peer.getOffer();
-    socketRef.current.emit("peer:nego:needed", { offer, to: remoteSocketId });
-  }, [remoteSocketId]);
-
-  // Set up peer connection event listeners
-  useEffect(() => {
-    if (!peer || !peer.peer) return;
-    
-    const handleTrack = async (ev) => {
-      console.log("Received track event:", ev);
-      const remoteStream = ev.streams;
-      console.log("GOT TRACKS!!", remoteStream);
-      
-      if (remoteStream && remoteStream[0]) {
-        setRemoteStream(remoteStream[0]);
-        
-        if (remoteVideoRef.current) {
-          remoteVideoRef.current.srcObject = remoteStream[0];
-          remoteVideoRef.current.play().catch(error => {
-            console.log('Auto-play prevented for remote video:', error);
-          });
-        }
-        
-        setIsConnected(true);
+      if (isComponentMountedRef.current) {
+        handleWebRTCError(error, 'creating offer');
       }
-    };
-    
-    const handleNegotiationNeeded = async () => {
-      console.log("Negotiation needed");
-      handlePeerNegotiationNeeded();
-    };
-    
-    console.log("Adding event listeners to peer connection");
-    peer.peer.addEventListener("track", handleTrack);
-    peer.peer.addEventListener("negotiationneeded", handleNegotiationNeeded);
-    
-    return () => {
-      console.log("Removing event listeners from peer connection");
-      peer.peer.removeEventListener("track", handleTrack);
-      peer.peer.removeEventListener("negotiationneeded", handleNegotiationNeeded);
-    };
-  }, [handlePeerNegotiationNeeded]);
+    }
+  };
 
   const toggleMute = () => {
     if (localStream) {
