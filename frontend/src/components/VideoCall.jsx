@@ -281,7 +281,10 @@ export default function VideoCall({
         return prev;
       });
 
-      const role = userId === socketRef.current.id ? userType : (userType === 'admin' ? 'Mentor' : 'Admin');
+      // Enhanced role detection for admin-mentor calls
+      const role = userId === socketRef.current.id
+        ? (userType === 'admin' ? 'Admin' : 'Mentor')
+        : (userType === 'admin' ? 'Mentor' : 'Admin');
       showNotificationPopup(`${role} joined the room`);
 
       // Update connection status if we have remote streams
