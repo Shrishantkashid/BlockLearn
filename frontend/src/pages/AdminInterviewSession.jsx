@@ -37,7 +37,7 @@ export default function AdminInterviewSession() {
   
   // State
   const [localStream, setLocalStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
+  const [remoteStreams, setRemoteStreams] = useState({});
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -49,6 +49,11 @@ export default function AdminInterviewSession() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [showChat, setShowChat] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [isCalling, setIsCalling] = useState(false);
+  const [caller, setCaller] = useState(null);
+  const [callAccepted, setCallAccepted] = useState(false);
+  const [otherParticipant, setOtherParticipant] = useState({ name: 'Mentor', hasVideo: false });
   
   // Show notification popup
   const showNotificationPopup = (message) => {
