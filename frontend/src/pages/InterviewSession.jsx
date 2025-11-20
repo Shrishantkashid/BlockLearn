@@ -607,7 +607,7 @@ export default function InterviewSession() {
           <div className="h-full bg-black flex items-center justify-center">
             <div className="relative w-full h-full flex items-center justify-center">
               {/* Remote Video Container */}
-              {remoteStream ? (
+              {Object.keys(remoteStreams).length > 0 ? (
                 <video
                   ref={remoteVideoRef}
                   autoPlay
@@ -621,13 +621,13 @@ export default function InterviewSession() {
                       <div className="bg-gray-700 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-4">
                         <User className="h-16 w-16 text-gray-400" />
                       </div>
-                      {!isConnected && !remoteSocketId && (
+                      {!isConnected && (
                         <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-white text-xs px-2 py-1 rounded flex items-center">
                           <AlertCircle className="h-3 w-3 mr-1" />
                           Waiting
                         </div>
                       )}
-                      {(isConnected || remoteSocketId) && (
+                      {isConnected && (
                         <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-xs px-2 py-1 rounded flex items-center">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Connected
@@ -636,7 +636,7 @@ export default function InterviewSession() {
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">Admin</h3>
                     <p className="text-gray-400 mb-4">
-                      {(isConnected || remoteSocketId) ? 'Video feed will appear here' : 'Waiting for admin to join...'}
+                      {isConnected ? 'Video feed will appear here' : 'Waiting for admin to join...'}
                     </p>
                   </div>
                 </div>
