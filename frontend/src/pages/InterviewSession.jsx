@@ -269,50 +269,137 @@ export default function InterviewSession() {
   };
 
   const initializeMedia = async () => {
+    if (!isComponentMountedRef.current) {
+      console.log('Component unmounted, skipping media initialization');
+      return;
+    }
+
+    console.log('initializeMedia called, localStream:', !!localStream, 'isInitializingRef:', isInitializingRef.current);
+
+    if (localStream) {
+      console.log('Local stream already initialized');
+      return;
+    }
+
+    if (isInitializingRef.current) {
+      console.log('Media initialization already in progress');
+      return;
+    }
+
+    isInitializingRef.current = true;
+
     try {
       console.log('Initializing media devices...');
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
-        }, 
-        audio: { 
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-      
+      const constraints = getMediaConstraints();
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
       if (!isComponentMountedRef.current) {
+        console.log('Component unmounted during async operation, stopping stream tracks');
         stream.getTracks().forEach(track => track.stop());
+        isInitializingRef.current = false;
         return;
       }
-      
+
+      console.log('Media stream acquired, checking if localStream already set:', !!localStream);
+
+      if (localStream) {
+        console.log('Local stream was set during async operation, stopping new stream tracks');
+        stream.getTracks().forEach(track => track.stop());
+        isInitializingRef.current = false;
+        return;
+      }
+
       console.log('Media stream acquired:', stream);
       setLocalStream(stream);
-      
+
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(error => {
           console.log('Auto-play prevented for local video:', error);
         });
       }
-      
-      // If there's already a remote user connected, initiate a call
-      if (remoteSocketId) {
-        setTimeout(() => {
-          handleCallUser();
-        }, 1000);
+
+      console.log('Creating peer connection...');
+      const pc = createPeerConnection();
+      peerConnectionRef.current = pc;
+
+      addStreamToPeerConnection(pc, stream);
+
+      // Handle remote stream
+      pc.ontrack = (event) => {
+        console.log('Received remote stream from:', event.streams[0].id);
+        const remoteStream = event.streams[0];
+
+        // For admin-mentor calls, use 'remote' key since it's 1-on-1
+        setRemoteStreams(prev => ({
+          ...prev,
+          'remote': remoteStream
+        }));
+
+        // Update connection status
+        setIsConnected(true);
+        setCallAccepted(true); // Automatically accept call when we receive a stream
+        console.log('Connection established, isConnected set to true');
+      };
+
+      // Handle ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate && socketRef.current) {
+          // Broadcast ICE candidates to room for admin-mentor calls
+          console.log('Broadcasting ICE candidate to room for admin-mentor call');
+          socketRef.current.emit('ice-candidate', {
+            roomId: code,
+            candidate: event.candidate
+          });
+        }
+      };
+
+      // Handle connection state changes
+      pc.onconnectionstatechange = () => {
+        console.log('Connection state:', pc.connectionState);
+        if (pc.connectionState === 'connected') {
+          setIsConnected(true);
+          console.log('Connection established via state change, isConnected set to true');
+        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          setIsConnected(false);
+          console.log('Connection lost via state change, isConnected set to false');
+        }
+      };
+
+      // Handle ICE connection state changes
+      pc.oniceconnectionstatechange = () => {
+        console.log('ICE connection state:', pc.iceConnectionState);
+        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          setIsConnected(false);
+          console.log('ICE connection lost, isConnected set to false');
+        } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setIsConnected(true);
+          console.log('ICE connection established, isConnected set to true');
+        }
+      };
+
+      // If there are already users in the room, initiate calls
+      if (members.length > 0) {
+        members.forEach(userId => {
+          console.log('Creating offer for existing user:', userId);
+          setTimeout(() => {
+            if (isComponentMountedRef.current) {
+              createOffer(userId);
+            }
+          }, 1500);
+        });
       }
-      
-      setLoading(false);
+
     } catch (error) {
       if (isComponentMountedRef.current) {
-        console.error('Error accessing media devices:', error);
-        setError('Failed to access camera/microphone. Please check permissions.');
+        handleWebRTCError(error, 'initializing media');
+        setError(`Failed to access camera/microphone: ${error.message}. Please check permissions.`);
       }
-      setLoading(false);
+      isInitializingRef.current = false;
+    } finally {
+      if (isComponentMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
