@@ -30,8 +30,10 @@ export default function InterviewSession() {
   // Refs
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const peerConnectionRef = useRef(null);
   const socketRef = useRef(null);
   const isComponentMountedRef = useRef(false);
+  const isInitializingRef = useRef(false);
   
   // State
   const [localStream, setLocalStream] = useState(null);
