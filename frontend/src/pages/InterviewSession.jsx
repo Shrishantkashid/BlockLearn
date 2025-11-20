@@ -64,11 +64,26 @@ export default function InterviewSession() {
     }, 3000);
   };
 
+  // Check WebRTC support on mount
+  useEffect(() => {
+    if (!isWebRTCSupported()) {
+      setError('WebRTC is not supported in your browser. Please use a modern browser like Chrome, Firefox, or Edge.');
+      setLoading(false);
+      return;
+    }
+  }, []);
+
   // Initialize socket connection and media
   useEffect(() => {
-    console.log('Component mounting, initializing socket and media');
+    // Prevent double mounting in development mode
+    if (isComponentMountedRef.current) {
+      console.log('Component already mounted, skipping initialization');
+      return;
+    }
+
     isComponentMountedRef.current = true;
-    
+    console.log('Component mounting, initializing socket and media');
+
     initializeSocket();
     initializeMedia();
 
@@ -76,24 +91,22 @@ export default function InterviewSession() {
     return () => {
       console.log('Cleaning up InterviewSession component');
       isComponentMountedRef.current = false;
-      
+
       if (socketRef.current) {
-        try {
-          socketRef.current.disconnect();
-        } catch (e) {
-          console.log('Error disconnecting socket:', e);
-        }
+        socketRef.current.disconnect();
         socketRef.current = null;
       }
-      
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
       if (localStream) {
-        try {
-          localStream.getTracks().forEach(track => track.stop());
-        } catch (e) {
-          console.log('Error stopping tracks:', e);
-        }
+        localStream.getTracks().forEach(track => {
+          track.stop();
+        });
         setLocalStream(null);
       }
+      isInitializingRef.current = false;
     };
   }, []);
 
