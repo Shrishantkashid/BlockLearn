@@ -59,15 +59,24 @@ BlockLearn is a innovative platform that connects learners with mentors for skil
    npm install
    ```
 
-4. Set up environment variables (see `.env.example` files)
+4. Install React-webRTC server dependencies:
+   ```bash
+   cd React-webRTC/server
+   npm install
+   ```
 
-5. Start the development servers:
+5. Set up environment variables (see `.env.example` files)
+
+6. Start the development servers:
    ```bash
    # In backend directory
    npm run dev
    
    # In frontend directory
    npm run dev
+   
+   # In React-webRTC/server directory
+   npm start
    ```
 
 ## Project Structure
@@ -76,6 +85,7 @@ BlockLearn is a innovative platform that connects learners with mentors for skil
 .
 ├── backend/          # Backend API and Socket.IO server
 ├── frontend/         # React frontend application
+├── React-webRTC/     # Integrated WebRTC video calling system
 ├── contracts/        # Solidity smart contracts
 ├── scripts/          # Deployment and utility scripts
 └── tests/            # Test files
@@ -109,10 +119,14 @@ BlockLearn is a innovative platform that connects learners with mentors for skil
 - Content moderation tools
 
 ### Mentor-Admin Video Calling
-- Secure peer-to-peer video conferencing
+- Secure peer-to-peer video conferencing using React-webRTC
 - Role-based access control
 - Session code sharing for easy connection
 - Real-time chat during calls
+
+## Video Calling Integration
+
+This project now includes an integrated React-webRTC video calling system for interview sessions between mentors and administrators. For detailed information about the integration, see [VIDEO_CALL_INTEGRATION.md](VIDEO_CALL_INTEGRATION.md).
 
 ## Development Guidelines
 

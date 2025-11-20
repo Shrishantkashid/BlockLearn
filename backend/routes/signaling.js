@@ -55,82 +55,112 @@ const initializeSocket = (server) => {
 
     // Handle offer
     socket.on('offer', (data) => {
-      console.log('Offer received from:', socket.id, 'to:', data.target);
+      console.log('Offer received from:', socket.id, 'to:', data.target || data.roomId);
       console.log('Offer data:', data.offer);
-      // Check if target socket exists
-      const targetSocket = io.sockets.sockets.get(data.target);
-      if (targetSocket) {
-        targetSocket.emit('offer', {
+
+      // Check if this is a room broadcast (mentor-admin call)
+      if (data.roomId) {
+        socket.to(data.roomId).emit('offer', {
           offer: data.offer,
           sender: socket.id
         });
-        console.log('Offer sent to target:', data.target);
-      } else {
-        console.log('Target socket not found:', data.target);
-        // Try to send to all users in the same room except sender
-        socket.rooms.forEach(roomId => {
-          if (roomId !== socket.id) {
-            socket.to(roomId).emit('offer', {
-              offer: data.offer,
-              sender: socket.id
-            });
-            console.log('Offer broadcast to room:', roomId);
-          }
-        });
+        console.log('Offer broadcast to room:', data.roomId);
+      } else if (data.target) {
+        // Check if target socket exists
+        const targetSocket = io.sockets.sockets.get(data.target);
+        if (targetSocket) {
+          targetSocket.emit('offer', {
+            offer: data.offer,
+            sender: socket.id
+          });
+          console.log('Offer sent to target:', data.target);
+        } else {
+          console.log('Target socket not found:', data.target);
+          // Try to send to all users in the same room except sender
+          socket.rooms.forEach(roomId => {
+            if (roomId !== socket.id) {
+              socket.to(roomId).emit('offer', {
+                offer: data.offer,
+                sender: socket.id
+              });
+              console.log('Offer broadcast to room:', roomId);
+            }
+          });
+        }
       }
     });
 
     // Handle answer
     socket.on('answer', (data) => {
-      console.log('Answer received from:', socket.id, 'to:', data.target);
+      console.log('Answer received from:', socket.id, 'to:', data.target || data.roomId);
       console.log('Answer data:', data.answer);
-      // Check if target socket exists
-      const targetSocket = io.sockets.sockets.get(data.target);
-      if (targetSocket) {
-        targetSocket.emit('answer', {
+
+      // Check if this is a room broadcast (mentor-admin call)
+      if (data.roomId) {
+        socket.to(data.roomId).emit('answer', {
           answer: data.answer,
           sender: socket.id
         });
-        console.log('Answer sent to target:', data.target);
-      } else {
-        console.log('Target socket not found:', data.target);
-        // Try to send to all users in the same room except sender
-        socket.rooms.forEach(roomId => {
-          if (roomId !== socket.id) {
-            socket.to(roomId).emit('answer', {
-              answer: data.answer,
-              sender: socket.id
-            });
-            console.log('Answer broadcast to room:', roomId);
-          }
-        });
+        console.log('Answer broadcast to room:', data.roomId);
+      } else if (data.target) {
+        // Check if target socket exists
+        const targetSocket = io.sockets.sockets.get(data.target);
+        if (targetSocket) {
+          targetSocket.emit('answer', {
+            answer: data.answer,
+            sender: socket.id
+          });
+          console.log('Answer sent to target:', data.target);
+        } else {
+          console.log('Target socket not found:', data.target);
+          // Try to send to all users in the same room except sender
+          socket.rooms.forEach(roomId => {
+            if (roomId !== socket.id) {
+              socket.to(roomId).emit('answer', {
+                answer: data.answer,
+                sender: socket.id
+              });
+              console.log('Answer broadcast to room:', roomId);
+            }
+          });
+        }
       }
     });
 
     // Handle ICE candidate
     socket.on('ice-candidate', (data) => {
-      console.log('ICE candidate received from:', socket.id, 'to:', data.target);
+      console.log('ICE candidate received from:', socket.id, 'to:', data.target || data.roomId);
       console.log('ICE candidate data:', data.candidate);
-      // Check if target socket exists
-      const targetSocket = io.sockets.sockets.get(data.target);
-      if (targetSocket) {
-        targetSocket.emit('ice-candidate', {
+
+      // Check if this is a room broadcast (mentor-admin call)
+      if (data.roomId) {
+        socket.to(data.roomId).emit('ice-candidate', {
           candidate: data.candidate,
           sender: socket.id
         });
-        console.log('ICE candidate sent to target:', data.target);
-      } else {
-        console.log('Target socket not found:', data.target);
-        // Try to send to all users in the same room except sender
-        socket.rooms.forEach(roomId => {
-          if (roomId !== socket.id) {
-            socket.to(roomId).emit('ice-candidate', {
-              candidate: data.candidate,
-              sender: socket.id
-            });
-            console.log('ICE candidate broadcast to room:', roomId);
-          }
-        });
+        console.log('ICE candidate broadcast to room:', data.roomId);
+      } else if (data.target) {
+        // Check if target socket exists
+        const targetSocket = io.sockets.sockets.get(data.target);
+        if (targetSocket) {
+          targetSocket.emit('ice-candidate', {
+            candidate: data.candidate,
+            sender: socket.id
+          });
+          console.log('ICE candidate sent to target:', data.target);
+        } else {
+          console.log('Target socket not found:', data.target);
+          // Try to send to all users in the same room except sender
+          socket.rooms.forEach(roomId => {
+            if (roomId !== socket.id) {
+              socket.to(roomId).emit('ice-candidate', {
+                candidate: data.candidate,
+                sender: socket.id
+              });
+              console.log('ICE candidate broadcast to room:', roomId);
+            }
+          });
+        }
       }
     });
 

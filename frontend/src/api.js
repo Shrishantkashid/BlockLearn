@@ -99,7 +99,7 @@ export async function getAllowedDomains() {
 // Validate interview code
 export async function validateInterviewCode(code) {
   const response = await api.get(`/api/auth/validate-interview-code/${code}`);
-  return response.data;
+  return response;
 }
 
 // Matching API endpoints

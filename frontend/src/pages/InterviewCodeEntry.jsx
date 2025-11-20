@@ -17,15 +17,21 @@ function InterviewCodeEntry() {
       // Call the backend API to validate the interview code
       const response = await validateInterviewCode(code);
       
-      if (response.success) {
+      if (response.data.success) {
         // Navigate to the interview session within the app
-        navigate(`/mentor/interview/${code}`);
+        window.location.href = response.data.meetingLink;
       } else {
-        setError(response.message || "Invalid interview code");
+        setError(response.data.message || "Invalid interview code");
       }
     } catch (err) {
       console.error("Error validating interview code:", err);
-      setError("Failed to validate interview code. Please try again.");
+      if (err.response && err.response.status === 400) {
+        setError("This interview session has already passed or is invalid.");
+      } else if (err.response && err.response.status === 404) {
+        setError("Invalid interview code. Please check the code and try again.");
+      } else {
+        setError("Failed to validate interview code. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

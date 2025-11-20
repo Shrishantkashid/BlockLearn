@@ -99,23 +99,25 @@ function MentorDashboard() {
 
   const fetchInterviewDetails = async (token) => {
     try {
-      const response = await api.get("/api/admin/mentor-interviews", {
+      const response = await api.get("/api/auth/my-interview", {
         headers: {
           Authorization: `Bearer ${token}`
         }
       });
       
-      const userData = JSON.parse(localStorage.getItem("userData") || "{}");
-      const mentorInterviews = response.data.data;
-      const currentUserInterview = mentorInterviews.find(
-        mentor => mentor.id === userData.id && mentor.interview
-      );
-      
-      if (currentUserInterview) {
-        setInterview(currentUserInterview.interview);
+      if (response.data.success && response.data.data) {
+        setInterview(response.data.data);
       }
     } catch (error) {
       console.error("Error fetching interview details:", error);
+      // Handle different error cases
+      if (error.response && error.response.status === 404) {
+        // No interview scheduled yet, which is fine
+        console.log("No interview scheduled yet");
+      } else if (error.response && error.response.status === 403) {
+        // User is not a mentor
+        console.error("User is not authorized as a mentor");
+      }
     } finally {
       setLoading(false);
     }
