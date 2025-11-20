@@ -606,7 +606,7 @@ export default function AdminInterviewSession() {
           <div className="flex items-center justify-center h-full bg-black">
             <div className="relative flex items-center justify-center w-full h-full">
               {/* Remote Video Container */}
-              {remoteStream ? (
+              {Object.keys(remoteStreams).length > 0 ? (
                 <video
                   ref={remoteVideoRef}
                   autoPlay
@@ -620,13 +620,13 @@ export default function AdminInterviewSession() {
                       <div className="flex items-center justify-center w-32 h-32 mx-auto mb-4 bg-gray-700 rounded-full">
                         <User className="w-16 h-16 text-gray-400" />
                       </div>
-                      {!isConnected && !remoteSocketId && (
+                      {!isConnected && (
                         <div className="absolute flex items-center px-2 py-1 text-xs text-white transform -translate-x-1/2 bg-yellow-500 rounded -bottom-2 left-1/2">
                           <AlertCircle className="w-3 h-3 mr-1" />
                           Waiting
                         </div>
                       )}
-                      {(isConnected || remoteSocketId) && (
+                      {isConnected && (
                         <div className="absolute flex items-center px-2 py-1 text-xs text-white transform -translate-x-1/2 bg-green-500 rounded -bottom-2 left-1/2">
                           <CheckCircle className="w-3 h-3 mr-1" />
                           Connected
@@ -635,7 +635,7 @@ export default function AdminInterviewSession() {
                     </div>
                     <h3 className="mb-2 text-xl font-bold text-white">Mentor</h3>
                     <p className="mb-4 text-gray-400">
-                      {(isConnected || remoteSocketId) ? 'Video feed will appear here' : 'Waiting for mentor to join...'}
+                      {isConnected ? 'Video feed will appear here' : 'Waiting for mentor to join...'}
                     </p>
                   </div>
                 </div>
