@@ -281,7 +281,10 @@ export default function VideoCall({
         return prev;
       });
 
-      const role = userId === socketRef.current.id ? userType : (userType === 'admin' ? 'Mentor' : 'Admin');
+      // Enhanced role detection for admin-mentor calls
+      const role = userId === socketRef.current.id
+        ? (userType === 'admin' ? 'Admin' : 'Mentor')
+        : (userType === 'admin' ? 'Mentor' : 'Admin');
       showNotificationPopup(`${role} joined the room`);
 
       // Update connection status if we have remote streams
@@ -350,7 +353,9 @@ export default function VideoCall({
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = null;
       }
-      showNotificationPopup(`${userType === 'admin' ? 'Mentor' : 'Admin'} left the room`);
+      // Enhanced role detection for user-left notifications
+      const role = userType === 'admin' ? 'Mentor' : 'Admin';
+      showNotificationPopup(`${role} left the room`);
       setOtherParticipant(prev => ({ ...prev, hasVideo: false }));
       setMembers(prev => prev.filter(member => member !== userId));
       console.log('User left, isConnected set to false');
