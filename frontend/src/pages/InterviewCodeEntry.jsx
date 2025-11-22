@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { validateInterviewCode, fetchUserProfile } from "../api";
+import api from "../api"; // Import the api service
 
 function InterviewCodeEntry() {
   const [code, setCode] = useState("");
@@ -13,9 +13,9 @@ function InterviewCodeEntry() {
   useEffect(() => {
     const getUserType = async () => {
       try {
-        const response = await fetchUserProfile();
-        if (response.success && response.user) {
-          setUserType(response.user.userType);
+        const response = await api.get('/api/auth/me');
+        if (response.data.success && response.data.user) {
+          setUserType(response.data.user.userType);
         }
       } catch (err) {
         console.error("Error fetching user profile:", err);
@@ -31,8 +31,15 @@ function InterviewCodeEntry() {
     setLoading(true);
 
     try {
-      // Call the backend API to validate the interview code
-      const response = await validateInterviewCode(code);
+      // Use the appropriate endpoint based on user type
+      let response;
+      if (userType === 'admin') {
+        // Use admin endpoint for admins
+        response = await api.get(`/api/admin/validate-interview-code/${code}`);
+      } else {
+        // Use general endpoint for others
+        response = await api.get(`/api/auth/validate-interview-code/${code}`);
+      }
       
       if (response.data.success) {
         // Determine which meeting link to use based on user type

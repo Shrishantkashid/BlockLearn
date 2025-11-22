@@ -7,8 +7,6 @@ function AdminDashboard() {
   const [mentors, setMentors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-  const [showCodeEntry, setShowCodeEntry] = useState(false);
-  const [interviewCode, setInterviewCode] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,18 +31,12 @@ function AdminDashboard() {
     }
   };
 
-  const handleJoinInterview = (code) => {
-    // Redirect to the interview code entry page with the interview code
-    navigate(`/interview/code-entry`);
-  };
-
-  const handleCodeSubmit = (e) => {
-    e.preventDefault();
-    if (interviewCode.trim()) {
-      handleJoinInterview(interviewCode.trim());
-      setShowCodeEntry(false);
-      setInterviewCode("");
-    }
+  const handleJoinInterview = () => {
+    // Instead of showing the code entry modal, directly redirect to a moderator Jitsi link
+    // Generate a unique room name for the interview using crypto.randomUUID()
+    const roomName = crypto.randomUUID();
+    // Redirect to the moderator Jitsi link with the correct format
+    window.location.href = `https://moderated.jitsi.net/a4840976807a4c4eb7f1b3591514d4b66cec6dc2e4ec44879911c3f7490456fe`;
   };
 
   const handleApproveMentor = async (mentorId) => {
@@ -127,8 +119,8 @@ function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-900">
+        <div className="w-12 h-12 border-b-2 rounded-full animate-spin border-primary"></div>
       </div>
     );
   }
@@ -136,21 +128,21 @@ function AdminDashboard() {
   // If user is not admin, show access denied message
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="max-w-md w-full text-center p-8">
-          <div className="mx-auto bg-red-100 dark:bg-red-900/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-900">
+        <div className="w-full max-w-md p-8 text-center">
+          <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full dark:bg-red-900/20">
             <Lock className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
-          <p className="text-gray-600 dark:text-slate-400 mb-6">
+          <h1 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">Access Denied</h1>
+          <p className="mb-6 text-gray-600 dark:text-slate-400">
             You don't have permission to access the admin dashboard. Please log in as an administrator.
           </p>
           <Link 
             to="/admin/login" 
-            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center px-4 py-2 text-white transition-colors rounded-lg bg-primary hover:bg-primary/90"
           >
             Go to Admin Login
-            <ArrowRight className="ml-2 w-4 h-4" />
+            <ArrowRight className="w-4 h-4 ml-2" />
           </Link>
         </div>
       </div>
@@ -160,20 +152,20 @@ function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white dark:bg-slate-800 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+      <header className="bg-white shadow-sm dark:bg-slate-800">
+        <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between py-6">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
             <div className="flex gap-3">
               <button 
-                onClick={() => setShowCodeEntry(true)}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                onClick={handleJoinInterview}
+                className="px-4 py-2 text-white transition-colors rounded-lg bg-primary hover:bg-primary/90"
               >
                 Join Interview
               </button>
               <button
                 onClick={fetchMentors}
-                className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                className="px-4 py-2 text-white transition-colors rounded-lg bg-primary hover:bg-primary/90"
               >
                 Refresh
               </button>
@@ -182,76 +174,20 @@ function AdminDashboard() {
         </div>
       </header>
 
-      {/* Interview Code Entry Modal */}
-      {showCodeEntry && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100">Join Interview</h2>
-              <button 
-                onClick={() => setShowCodeEntry(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
-                </svg>
-              </button>
-            </div>
-            
-            <form onSubmit={handleCodeSubmit}>
-              <div className="mb-6">
-                <label htmlFor="interviewCode" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">
-                  Interview Code
-                </label>
-                <input
-                  id="interviewCode"
-                  type="text"
-                  value={interviewCode}
-                  onChange={(e) => setInterviewCode(e.target.value.toUpperCase())}
-                  placeholder="Enter 8-character code"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary dark:bg-slate-700 dark:text-slate-100"
-                  maxLength={8}
-                  required
-                />
-                <p className="mt-2 text-sm text-gray-500 dark:text-slate-400">
-                  Enter the 8-character interview code
-                </p>
-              </div>
-              
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCodeEntry(false)}
-                  className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-                >
-                  Join Interview
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="px-4 py-8 mx-auto max-w-7xl sm:px-6 lg:px-8">
         {/* Message Display */}
         {message && (
-          <div className="mb-6 p-4 rounded-lg bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800">
+          <div className="p-4 mb-6 text-blue-800 bg-blue-100 border border-blue-200 rounded-lg dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-800">
             <p className="text-sm font-medium">{message}</p>
           </div>
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
+        <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-4">
+          <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-slate-800 dark:border-slate-700">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
+              <div className="p-2 bg-blue-100 rounded-lg dark:bg-blue-900/20">
                 <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div className="ml-4">
@@ -261,9 +197,9 @@ function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
+          <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-slate-800 dark:border-slate-700">
             <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg">
+              <div className="p-2 bg-yellow-100 rounded-lg dark:bg-yellow-900/20">
                 <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="ml-4">
@@ -275,9 +211,9 @@ function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
+          <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-slate-800 dark:border-slate-700">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-lg">
+              <div className="p-2 bg-green-100 rounded-lg dark:bg-green-900/20">
                 <Award className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="ml-4">
@@ -289,9 +225,9 @@ function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700">
+          <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-slate-800 dark:border-slate-700">
             <div className="flex items-center">
-              <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
+              <div className="p-2 bg-purple-100 rounded-lg dark:bg-purple-900/20">
                 <Users className="w-6 h-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div className="ml-4">
@@ -305,15 +241,15 @@ function AdminDashboard() {
         </div>
 
         {/* Pending Approval Section */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden mb-8">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+        <div className="p-6 mb-8 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-slate-800 dark:border-slate-700">
+          <div className="pb-4 mb-4 border-b border-gray-200 dark:border-slate-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Pending Mentor Approvals</h2>
           </div>
           
           {pendingApprovalMentors.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No pending approvals</h3>
+            <div className="py-12 text-center">
+              <Users className="w-12 h-12 mx-auto text-gray-400" />
+              <h3 className="mt-2 mb-1 text-lg font-medium text-gray-900 dark:text-slate-100">No pending approvals</h3>
               <p className="text-gray-500 dark:text-slate-400">All mentors have been reviewed.</p>
             </div>
           ) : (
@@ -321,31 +257,31 @@ function AdminDashboard() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                 <thead className="bg-gray-50 dark:bg-slate-700">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Mentor
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Interview Code
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Scheduled Time
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Status
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                <tbody className="bg-white divide-y divide-gray-200 dark:divide-slate-700 dark:bg-slate-800">
                   {pendingApprovalMentors.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="text-primary font-medium">
+                          <div className="flex-shrink-0 w-10 h-10">
+                            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
+                              <span className="font-medium text-primary">
                                 {item.user?.firstName?.charAt(0)}{item.user?.lastName?.charAt(0)}
                               </span>
                             </div>
@@ -361,7 +297,7 @@ function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-slate-100 font-mono">
+                        <div className="font-mono text-sm text-gray-900 dark:text-slate-100">
                           {item.interview?.interview_code || "N/A"}
                         </div>
                       </td>
@@ -375,7 +311,7 @@ function AdminDashboard() {
                           {item.interview?.status || "N/A"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleApproveMentor(item.id)}
@@ -393,7 +329,12 @@ function AdminDashboard() {
                           </button>
                           {item.interview?.interview_code && (
                             <button
-                              onClick={() => handleJoinInterview(item.interview.interview_code)}
+                              onClick={() => {
+                                // For individual mentor interviews, redirect to the specific room
+                                if (item.interview?.jitsi_room_name) {
+                                  window.location.href = `https://moderated.jitsi.net/${item.interview.jitsi_room_name}`;
+                                }
+                              }}
                               className="text-primary hover:text-primary/80"
                               title="Join Interview"
                             >
@@ -411,15 +352,15 @@ function AdminDashboard() {
         </div>
 
         {/* Approved Mentors Section */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden mb-8">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+        <div className="p-6 mb-8 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-slate-800 dark:border-slate-700">
+          <div className="pb-4 mb-4 border-b border-gray-200 dark:border-slate-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Approved Mentors (Interview Scheduled)</h2>
           </div>
           
           {approvedMentors.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No approved mentors</h3>
+            <div className="py-12 text-center">
+              <Users className="w-12 h-12 mx-auto text-gray-400" />
+              <h3 className="mt-2 mb-1 text-lg font-medium text-gray-900 dark:text-slate-100">No approved mentors</h3>
               <p className="text-gray-500 dark:text-slate-400">No mentors have been approved yet.</p>
             </div>
           ) : (
@@ -427,31 +368,31 @@ function AdminDashboard() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                 <thead className="bg-gray-50 dark:bg-slate-700">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Mentor
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Interview Code
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Scheduled Time
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Status
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                <tbody className="bg-white divide-y divide-gray-200 dark:divide-slate-700 dark:bg-slate-800">
                   {approvedMentors.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-                              <span className="text-green-600 dark:text-green-400 font-medium">
+                          <div className="flex-shrink-0 w-10 h-10">
+                            <div className="flex items-center justify-center w-10 h-10 bg-green-100 rounded-full dark:bg-green-900/20">
+                              <span className="font-medium text-green-600 dark:text-green-400">
                                 {item.user?.firstName?.charAt(0)}{item.user?.lastName?.charAt(0)}
                               </span>
                             </div>
@@ -467,7 +408,7 @@ function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-slate-100 font-mono">
+                        <div className="font-mono text-sm text-gray-900 dark:text-slate-100">
                           {item.interview?.interview_code || "N/A"}
                         </div>
                       </td>
@@ -481,12 +422,17 @@ function AdminDashboard() {
                           {item.interview?.status || "N/A"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
                         <div className="flex space-x-2">
-                          <span className="text-green-600 font-medium">Approved</span>
+                          <span className="font-medium text-green-600">Approved</span>
                           {item.interview?.interview_code && (
                             <button
-                              onClick={() => handleJoinInterview(item.interview.interview_code)}
+                              onClick={() => {
+                                // For individual mentor interviews, redirect to the specific room
+                                if (item.interview?.jitsi_room_name) {
+                                  window.location.href = `https://moderated.jitsi.net/${item.interview.jitsi_room_name}`;
+                                }
+                              }}
                               className="text-primary hover:text-primary/80"
                               title="Join Interview"
                             >
@@ -504,15 +450,15 @@ function AdminDashboard() {
         </div>
 
         {/* Rejected Mentors Section */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+        <div className="p-6 bg-white border border-gray-200 rounded-lg shadow-sm dark:bg-slate-800 dark:border-slate-700">
+          <div className="pb-4 mb-4 border-b border-gray-200 dark:border-slate-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Rejected Mentors</h2>
           </div>
           
           {rejectedMentors.length === 0 ? (
-            <div className="px-6 py-12 text-center">
-              <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100 mb-1">No rejected mentors</h3>
+            <div className="py-12 text-center">
+              <Users className="w-12 h-12 mx-auto text-gray-400" />
+              <h3 className="mt-2 mb-1 text-lg font-medium text-gray-900 dark:text-slate-100">No rejected mentors</h3>
               <p className="text-gray-500 dark:text-slate-400">No mentors have been rejected yet.</p>
             </div>
           ) : (
@@ -520,28 +466,28 @@ function AdminDashboard() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                 <thead className="bg-gray-50 dark:bg-slate-700">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Mentor
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Email
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Status
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase dark:text-slate-300">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                <tbody className="bg-white divide-y divide-gray-200 dark:divide-slate-700 dark:bg-slate-800">
                   {rejectedMentors.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
-                              <span className="text-red-600 dark:text-red-400 font-medium">
+                          <div className="flex-shrink-0 w-10 h-10">
+                            <div className="flex items-center justify-center w-10 h-10 bg-red-100 rounded-full dark:bg-red-900/20">
+                              <span className="font-medium text-red-600 dark:text-red-400">
                                 {item.user?.firstName?.charAt(0)}{item.user?.lastName?.charAt(0)}
                               </span>
                             </div>
@@ -559,12 +505,12 @@ function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                        <span className="inline-flex px-2 text-xs font-semibold leading-5 text-red-800 bg-red-100 rounded-full">
                           Rejected
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <span className="text-red-600 font-medium">Rejected</span>
+                      <td className="px-6 py-4 text-sm font-medium whitespace-nowrap">
+                        <span className="font-medium text-red-600">Rejected</span>
                       </td>
                     </tr>
                   ))}

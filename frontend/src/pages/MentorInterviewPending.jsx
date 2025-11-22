@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../api";
 import { Calendar, Clock, Mail, Phone, Video } from "lucide-react";
 
 export default function MentorInterviewPending() {
@@ -9,7 +10,27 @@ export default function MentorInterviewPending() {
     minutes: 35,
     seconds: 22
   });
+  const [interview, setInterview] = useState(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  // Fetch interview details when component mounts
+  useEffect(() => {
+    fetchInterviewDetails();
+  }, []);
+
+  const fetchInterviewDetails = async () => {
+    try {
+      const response = await api.get("/api/auth/my-interview");
+      if (response.data.success && response.data.data) {
+        setInterview(response.data.data);
+      }
+    } catch (error) {
+      console.error("Error fetching interview details:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Countdown timer effect
   useEffect(() => {
@@ -35,11 +56,23 @@ export default function MentorInterviewPending() {
 
   // Function to join the interview session
   const joinInterview = () => {
-    // TODO: Implement interview joining logic
-    console.log('Join interview');
-    // For now, just show an alert
-    alert('Interview functionality has been removed. You will implement your own interview call feature.');
+    if (interview && interview.meetingLink) {
+      // Redirect mentor directly to the mentor meeting link
+      window.location.href = interview.meetingLink;
+    } else {
+      // Fallback to the format you provided
+      alert("Redirecting to interview meeting...");
+      window.location.href = "https://meet.jit.si/moderated/4754bc865a90cabf3bfc32a4de2b5dca678ab4cb992dba03b38a750e9354a408";
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
@@ -69,12 +102,28 @@ export default function MentorInterviewPending() {
                 <Calendar className="w-5 h-5 text-primary mr-2" />
                 <h3 className="font-semibold text-gray-900 dark:text-slate-100">Date & Time</h3>
               </div>
-              <p className="text-gray-700 dark:text-slate-300">
-                Friday, November 15, 2025
-              </p>
-              <p className="text-gray-700 dark:text-slate-300">
-                2:30 PM - 3:30 PM (60 minutes)
-              </p>
+              {interview ? (
+                <>
+                  <p className="text-gray-700 dark:text-slate-300">
+                    {new Date(interview.scheduledAt).toLocaleDateString()}
+                  </p>
+                  <p className="text-gray-700 dark:text-slate-300">
+                    {new Date(interview.scheduledAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })} ({interview.durationMinutes} minutes)
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-700 dark:text-slate-300">
+                    Friday, November 15, 2025
+                  </p>
+                  <p className="text-gray-700 dark:text-slate-300">
+                    2:30 PM - 3:30 PM (60 minutes)
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
@@ -82,9 +131,15 @@ export default function MentorInterviewPending() {
                 <Video className="w-5 h-5 text-primary mr-2" />
                 <h3 className="font-semibold text-gray-900 dark:text-slate-100">Meeting Link</h3>
               </div>
-              <p className="text-gray-700 dark:text-slate-300 break-all">
-                https://meet.google.com/abc-defg-hij
-              </p>
+              {interview && interview.meetingLink ? (
+                <p className="text-gray-700 dark:text-slate-300 break-all">
+                  {interview.meetingLink}
+                </p>
+              ) : (
+                <p className="text-gray-700 dark:text-slate-300 break-all">
+                  https://meet.google.com/abc-defg-hij
+                </p>
+              )}
             </div>
 
             <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">

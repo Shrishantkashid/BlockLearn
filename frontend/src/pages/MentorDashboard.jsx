@@ -340,12 +340,8 @@ function MentorDashboard() {
               <div className="mt-4">
                 <button 
                   onClick={() => {
-                    if (interview && interview.meetingLink) {
-                      // Redirect mentor directly to the mentor meeting link
-                      window.location.href = interview.meetingLink;
-                    } else {
-                      alert("Meeting link not available. Please try again.");
-                    }
+                    // Redirect to the specific moderated Jitsi link you provided
+                    window.location.href = "https://meet.jit.si/moderated/4754bc865a90cabf3bfc32a4de2b5dca678ab4cb992dba03b38a750e9354a408";
                   }}
                   className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
