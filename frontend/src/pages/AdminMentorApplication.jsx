@@ -36,7 +36,12 @@ export default function AdminMentorApplication() {
 
   const fetchMentorApplication = async () => {
     try {
-      const response = await fetch(`/api/admin/mentor-application/${mentorId}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/admin/mentor-application/${mentorId}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
       const data = await response.json();
       
       if (data.success) {
@@ -51,10 +56,12 @@ export default function AdminMentorApplication() {
 
   const approveMentor = async () => {
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/mentor-approve/${mentorId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
       });
       
@@ -74,10 +81,12 @@ export default function AdminMentorApplication() {
 
   const rejectMentor = async () => {
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/mentor-reject/${mentorId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
       });
       
@@ -92,24 +101,6 @@ export default function AdminMentorApplication() {
     } catch (error) {
       console.error("Error rejecting mentor:", error);
       alert("Error rejecting mentor");
-    }
-  };
-
-  const joinInterview = () => {
-    console.log('Application data:', application);
-    if (application && application.interview) {
-      console.log('Interview data:', application.interview);
-      if (application.interview.admin_meeting_link) {
-        console.log('Redirecting to admin meeting link:', application.interview.admin_meeting_link);
-        // Redirect admin directly to the admin meeting link
-        window.location.assign(application.interview.admin_meeting_link);
-      } else {
-        console.log('Admin meeting link not available in interview data');
-        alert("Admin meeting link not available. Please try again.");
-      }
-    } else {
-      console.log('Interview data not available');
-      alert("Interview data not available. Please try again.");
     }
   };
 
@@ -137,10 +128,12 @@ export default function AdminMentorApplication() {
     e.preventDefault();
     
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/schedule-interview/${mentorId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           scheduledAt: scheduleData.scheduledAt,
@@ -177,10 +170,12 @@ export default function AdminMentorApplication() {
     }
     
     try {
+      const token = localStorage.getItem('token');
       const response = await fetch(`/api/admin/cancel-interview/${application.interview._id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
       });
       

@@ -261,6 +261,9 @@ export default function Login() {
                 Sign up here
               </Link>
             </p>
+            <Link to="/admin/login" className="text-muted-foreground hover:text-foreground text-sm flex items-center justify-center gap-2 transition-colors">
+              Admin Login
+            </Link>
             <Link to="/" className="text-muted-foreground hover:text-foreground text-sm flex items-center justify-center gap-2 transition-colors">
               <ArrowLeft className="w-4 h-4" />
               Back to home

@@ -241,6 +241,24 @@ const PreLogin = () => {
                   >
                     Create New Account
                   </button>
+                  
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-border/30"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-card/50 dark:bg-slate-900/50 text-muted-foreground">
+                        Administrators
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Link
+                    to="/admin/login"
+                    className="w-full px-8 py-4 rounded-xl bg-card dark:bg-slate-800 text-foreground border border-border shadow-sm hover:bg-card/80 dark:hover:bg-slate-800/80 transition-all font-medium flex items-center justify-center"
+                  >
+                    Admin Login
+                  </Link>
                 </div>
               </div>
             )}

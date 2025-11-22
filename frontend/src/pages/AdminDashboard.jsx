@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import api from "../api"; // Use the api service instead of axios directly
-import { Users, BookOpen, Award, CheckCircle, XCircle, Clock, Search } from "lucide-react";
+import { Users, BookOpen, Award, CheckCircle, XCircle, Clock, Search, Lock, ArrowRight } from "lucide-react";
 
 function AdminDashboard() {
   const [mentors, setMentors] = useState([]);
@@ -118,12 +118,41 @@ function AdminDashboard() {
     mentor.user?.applicationStatus === 'rejected'
   );
   
+  // Check if user is actually an admin
+  const userData = localStorage.getItem('userData');
+  const user = userData ? JSON.parse(userData) : null;
+  const isAdmin = user && user.userType === 'admin';
+  
   // Note: We now properly distinguish between pending and rejected mentors using applicationStatus
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // If user is not admin, show access denied message
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="max-w-md w-full text-center p-8">
+          <div className="mx-auto bg-red-100 dark:bg-red-900/20 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+            <Lock className="w-8 h-8 text-red-600 dark:text-red-400" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
+          <p className="text-gray-600 dark:text-slate-400 mb-6">
+            You don't have permission to access the admin dashboard. Please log in as an administrator.
+          </p>
+          <Link 
+            to="/admin/login" 
+            className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            Go to Admin Login
+            <ArrowRight className="ml-2 w-4 h-4" />
+          </Link>
+        </div>
       </div>
     );
   }
