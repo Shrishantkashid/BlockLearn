@@ -1,9 +1,9 @@
 // backend/utils/databaseMigration.js
-const { connectDB } = require('../config/database');
+const { getDB } = require('../config/database');
 
 async function initializeDatabase() {
   try {
-    const db = await connectDB();
+    const db = await getDB();
     
     // Check if this is a mock database (offline mode)
     if (!db.listCollections) {

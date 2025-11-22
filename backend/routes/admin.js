@@ -1,6 +1,6 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { connectDB } = require('../config/database');
+const { getDB } = require('../config/database');
 const { sendWelcomeEmail } = require('../config/email');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -24,7 +24,7 @@ const isAdmin = (req, res, next) => {
 router.get("/mentor-interviews-public", async (req, res) => {
   try {
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const mentorApplicationsCollection = db.collection('mentor_applications');
     const interviewSessionsCollection = db.collection('interview_sessions');
@@ -83,7 +83,7 @@ router.get("/mentor-interviews-public", async (req, res) => {
 router.get("/mentor-interviews", authenticateToken, isAdmin, async (req, res) => {
   try {
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const mentorApplicationsCollection = db.collection('mentor_applications');
     const interviewSessionsCollection = db.collection('interview_sessions');
@@ -144,7 +144,7 @@ router.post("/mentor-approve/:mentorId", authenticateToken, isAdmin, async (req,
     const { mentorId } = req.params;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const mentorApplicationsCollection = db.collection('mentor_applications');
 
@@ -279,7 +279,7 @@ router.post("/mentor-reject/:mentorId", authenticateToken, isAdmin, async (req, 
     const { mentorId } = req.params;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const mentorApplicationsCollection = db.collection('mentor_applications');
 
@@ -342,7 +342,7 @@ router.get("/mentor-application/:mentorId", authenticateToken, isAdmin, async (r
     const { mentorId } = req.params;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const mentorApplicationsCollection = db.collection('mentor_applications');
     const userSkillsCollection = db.collection('user_skills');
@@ -408,7 +408,7 @@ router.post("/schedule-interview/:mentorId", authenticateToken, isAdmin, async (
     const { scheduledAt, durationMinutes } = req.body;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const interviewSessionsCollection = db.collection('interview_sessions');
 
@@ -450,14 +450,25 @@ router.post("/schedule-interview/:mentorId", authenticateToken, isAdmin, async (
 
     const interviewCode = generateUniqueCode();
 
+    // Generate a unique Jitsi room name using crypto.randomUUID()
+    const jitsiRoomName = require('crypto').randomUUID();
+
+    // Generate moderated meeting links for admin and mentor
+    // Admin link (moderated)
+    const adminMeetingLink = `https://moderated.jitsi.net/${jitsiRoomName}`;
+    // Mentor link (standard with room name)
+    const mentorMeetingLink = `https://meet.jit.si/${jitsiRoomName}`;
+
     // Schedule the interview
     const interviewData = {
       mentor_id: new ObjectId(mentorId),
       scheduled_at: new Date(scheduledAt),
       duration_minutes: durationMinutes || 30,
       status: 'scheduled',
-      meeting_link: `http://localhost:5173/mentor/interview/${interviewCode}`,
+      meeting_link: mentorMeetingLink, // Default link for mentor
+      admin_meeting_link: adminMeetingLink, // Separate link for admin
       interview_code: interviewCode, // Store the unique code
+      jitsi_room_name: jitsiRoomName, // Store the unique Jitsi room name
       created_at: new Date(),
       updated_at: new Date()
     };
@@ -507,7 +518,8 @@ router.post("/schedule-interview/:mentorId", authenticateToken, isAdmin, async (
                 <p style="margin: 10px 0;"><strong>Time:</strong> ${formattedTime}</p>
                 <p style="margin: 10px 0;"><strong>Duration:</strong> ${interviewData.duration_minutes} minutes</p>
                 <p style="margin: 10px 0;"><strong>Interview Code:</strong> <span style="font-size: 18px; font-weight: bold; color: #2b57af;">${interviewCode}</span></p>
-                <p style="margin: 10px 0;"><strong>Meeting Link:</strong> <a href="${interviewData.meeting_link}" style="color: #2b57af; text-decoration: none; font-weight: bold;">Join Interview</a></p>
+                <p style="margin: 10px 0;"><strong>Admin Meeting Link:</strong> <a href="${adminMeetingLink}" style="color: #2b57af; text-decoration: none; font-weight: bold;">Join as Admin</a></p>
+                <p style="margin: 10px 0;"><strong>Mentor Meeting Link:</strong> <a href="${mentorMeetingLink}" style="color: #2b57af; text-decoration: none; font-weight: bold;">Join as Mentor</a></p>
               </div>
               
               <p style="font-size: 14px; color: #666666; margin: 20px 0;">
@@ -560,7 +572,7 @@ router.put("/update-interview/:interviewId", authenticateToken, isAdmin, async (
     const { scheduledAt, durationMinutes } = req.body;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const interviewSessionsCollection = db.collection('interview_sessions');
 
     // Update the interview
@@ -608,7 +620,7 @@ router.delete("/cancel-interview/:interviewId", authenticateToken, isAdmin, asyn
     const { interviewId } = req.params;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const interviewSessionsCollection = db.collection('interview_sessions');
 
     // Update the interview status to cancelled
@@ -650,9 +662,8 @@ router.get("/validate-interview-code/:code", async (req, res) => {
     const { code } = req.params;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     
-    // Remove mock database check - always use real database
     const interviewSessionsCollection = db.collection('interview_sessions');
 
     // Find interview session with the provided code
@@ -691,6 +702,8 @@ router.get("/validate-interview-code/:code", async (req, res) => {
     res.json({
       success: true,
       meetingLink: interview.meeting_link,
+      adminMeetingLink: interview.admin_meeting_link,
+      jitsiRoomName: interview.jitsi_room_name,
       interviewCode: interview.interview_code,
       scheduledAt: interview.scheduled_at,
       durationMinutes: interview.duration_minutes

@@ -1,7 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
-const { connectDB } = require("../config/database");
+const { getDB } = require("../config/database");
 const { sendOTP, sendWelcomeEmail } = require("../config/email");
 const nodemailer = require('nodemailer');
 const { generateOTP, isValidCampusEmail } = require("../utils/helper");
@@ -76,7 +76,7 @@ router.post("/send-otp", otpLimiter, async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
 
     // Store OTP in DB
     const collection = db.collection('email_verifications');
@@ -164,7 +164,7 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
 
     // Check OTP
     const collection = db.collection('email_verifications');
@@ -292,7 +292,7 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res) => {
 router.get("/me", authenticateToken, async (req, res) => {
   try {
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const collection = db.collection('users');
     
     // Query names to ensure first/last name are present even if middleware doesn't include them
@@ -357,7 +357,7 @@ router.post("/google", async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
 
@@ -447,7 +447,7 @@ router.put("/profile", async (req, res) => {
     }
     
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
     
@@ -511,7 +511,7 @@ router.get("/profile/:userId", async (req, res) => {
     }
     
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
     
@@ -571,7 +571,7 @@ router.post("/admin-login", async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
 
     // Check if admin user exists in database, if not create it
@@ -638,7 +638,7 @@ router.post("/mentor-application", authenticateToken, async (req, res) => {
     } = req.body;
     
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const mentorApplicationsCollection = db.collection('mentor_applications');
     const interviewSessionsCollection = db.collection('interview_sessions');
@@ -818,7 +818,7 @@ router.get("/validate-interview-code/:code", async (req, res) => {
     const { code } = req.params;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     
     const interviewSessionsCollection = db.collection('interview_sessions');
 
@@ -881,7 +881,7 @@ router.get("/my-interview", authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const interviewSessionsCollection = db.collection('interview_sessions');
 

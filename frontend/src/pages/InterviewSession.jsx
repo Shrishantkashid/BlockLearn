@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import io from "socket.io-client";
-import {
-  isWebRTCSupported,
-  getMediaConstraints,
-  createPeerConnection,
-  addStreamToPeerConnection,
-  handleWebRTCError,
-  closeConnection
-} from "../utils/webrtcUtils";
+import peer from "../services/peer"; // Use the same peer service
 import { 
   Phone, 
   Video, 
@@ -30,14 +23,12 @@ export default function InterviewSession() {
   // Refs
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const peerConnectionRef = useRef(null);
   const socketRef = useRef(null);
   const isComponentMountedRef = useRef(false);
-  const isInitializingRef = useRef(false);
   
   // State
   const [localStream, setLocalStream] = useState(null);
-  const [remoteStreams, setRemoteStreams] = useState({});
+  const [remoteStream, setRemoteStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -49,11 +40,6 @@ export default function InterviewSession() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [showChat, setShowChat] = useState(false);
-  const [members, setMembers] = useState([]);
-  const [isCalling, setIsCalling] = useState(false);
-  const [caller, setCaller] = useState(null);
-  const [callAccepted, setCallAccepted] = useState(false);
-  const [otherParticipant, setOtherParticipant] = useState({ name: 'Admin', hasVideo: false });
   
   // Show notification popup
   const showNotificationPopup = (message) => {
@@ -64,26 +50,11 @@ export default function InterviewSession() {
     }, 3000);
   };
 
-  // Check WebRTC support on mount
-  useEffect(() => {
-    if (!isWebRTCSupported()) {
-      setError('WebRTC is not supported in your browser. Please use a modern browser like Chrome, Firefox, or Edge.');
-      setLoading(false);
-      return;
-    }
-  }, []);
-
   // Initialize socket connection and media
   useEffect(() => {
-    // Prevent double mounting in development mode
-    if (isComponentMountedRef.current) {
-      console.log('Component already mounted, skipping initialization');
-      return;
-    }
-
-    isComponentMountedRef.current = true;
     console.log('Component mounting, initializing socket and media');
-
+    isComponentMountedRef.current = true;
+    
     initializeSocket();
     initializeMedia();
 
@@ -91,353 +62,259 @@ export default function InterviewSession() {
     return () => {
       console.log('Cleaning up InterviewSession component');
       isComponentMountedRef.current = false;
-
+      
       if (socketRef.current) {
-        socketRef.current.disconnect();
+        try {
+          socketRef.current.disconnect();
+        } catch (e) {
+          console.log('Error disconnecting socket:', e);
+        }
         socketRef.current = null;
       }
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
+      
       if (localStream) {
-        localStream.getTracks().forEach(track => {
-          track.stop();
-        });
+        try {
+          localStream.getTracks().forEach(track => track.stop());
+        } catch (e) {
+          console.log('Error stopping tracks:', e);
+        }
         setLocalStream(null);
       }
-      isInitializingRef.current = false;
     };
   }, []);
 
   const initializeSocket = () => {
-    // Determine the backend URL based on environment
-    const backendUrl = import.meta.env.VITE_API_URL ||
-                      (window.location.hostname.includes('vercel.app')
-                        ? `https://${window.location.hostname}`
-                        : 'http://localhost:5000');
-
-    console.log('Connecting to signaling server at:', backendUrl);
-
-    // Connect to the unified signaling server with improved configuration
-    socketRef.current = io(backendUrl, {
+    // Connect to the signaling server with better error handling
+    socketRef.current = io("http://localhost:5000", {
       transports: ['websocket', 'polling'],
-      withCredentials: true,
+      withCredentials: false,
       reconnection: true,
-      reconnectionAttempts: 15,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       randomizationFactor: 0.5,
-      timeout: 20000,
-      path: '/socket.io',
-      upgrade: false,
-      rememberUpgrade: false,
-      forceNew: true,
-      rejectUnauthorized: false
+      timeout: 10000,
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('Connected to signaling server with ID:', socketRef.current.id);
-      socketRef.current.emit('join-room', code);
+    socketRef.current.on("connect", () => {
+      console.log(`Socket Connected`, socketRef.current.id);
+      // Join the room with the interview code
+      socketRef.current.emit("room:join", { email: "mentor@" + code, room: code });
     });
 
-    socketRef.current.on('connect_error', (error) => {
+    socketRef.current.on("room:join", (data) => {
+      console.log("Room joined", data);
+      showNotificationPopup('Joined interview room');
+    });
+
+    socketRef.current.on("user:joined", ({ email, id }) => {
+      console.log(`User ${email} joined room with id ${id}`);
+      showNotificationPopup(`${email} joined the room`);
+      setRemoteSocketId(id);
+      
+      // If we have a local stream, initiate a call after a short delay
+      // If we don't have a local stream yet, the initializeMedia function will handle it
+      if (localStream) {
+        setTimeout(() => {
+          handleCallUser();
+        }, 1000);
+      }
+    });
+
+    socketRef.current.on("incomming:call", ({ from, offer }) => {
+      console.log("Incoming call from", from);
+      setRemoteSocketId(from);
+      
+      // Handle incoming call
+      handleIncomingCall({ from, offer });
+    });
+
+    socketRef.current.on("call:accepted", ({ from, ans }) => {
+      console.log("Call accepted by", from);
+      console.log("Setting local description with answer");
+      peer.setLocalDescription(ans);
+      setIsConnected(true);
+      showNotificationPopup('Call connected');
+      
+      // Send our stream
+      console.log("Sending streams after call acceptance");
+      sendStreams();
+    });
+
+    socketRef.current.on("peer:nego:needed", ({ from, offer }) => {
+      console.log("Peer negotiation needed", from, offer);
+      handlePeerNegotiationNeeded({ from, offer });
+    });
+
+    socketRef.current.on("peer:nego:final", ({ from, ans }) => {
+      console.log("Peer negotiation final", from, ans);
+      peer.setLocalDescription(ans);
+    });
+
+    socketRef.current.on("connect_error", (error) => {
       console.error('Socket connection error:', error);
-      setError('Failed to connect to signaling server. Please try again.');
-    });
-
-    // Handle offer from admin
-    socketRef.current.on('offer', async (data) => {
-      console.log('Received offer:', data);
-      try {
-        setCaller(data.sender); // Set the caller to the sender of the offer
-        setIsCalling(true);
-
-        if (peerConnectionRef.current) {
-          console.log('Creating answer for offer from:', data.sender);
-          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.offer));
-          const answer = await peerConnectionRef.current.createAnswer();
-          await peerConnectionRef.current.setLocalDescription(answer);
-
-          if (socketRef.current) {
-            socketRef.current.emit('answer', {
-              roomId: code,
-              answer: answer
-            });
-            console.log('Answer broadcast to room for admin-mentor call');
-          }
-        }
-      } catch (error) {
-        handleWebRTCError(error, 'handling offer');
-      }
-    });
-
-    // Handle answer from admin
-    socketRef.current.on('answer', async (data) => {
-      console.log('Received answer:', data);
-      if (peerConnectionRef.current) {
-        try {
-          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-          setCallAccepted(true);
-          setIsConnected(true);
-          showNotificationPopup('Admin joined the interview session');
-          setOtherParticipant(prev => ({ ...prev, hasVideo: true }));
-          console.log('Answer received and processed, isConnected set to true');
-
-          if (remoteVideoRef.current && Object.keys(remoteStreams).length > 0) {
-            remoteVideoRef.current.play().catch(error => {
-              console.log('Auto-play prevented for remote video:', error);
-            });
-          }
-        } catch (error) {
-          handleWebRTCError(error, 'handling answer');
-        }
-      }
-    });
-
-    // Handle ICE candidate
-    socketRef.current.on('ice-candidate', async (data) => {
-      console.log('Received ICE candidate:', data);
-      if (peerConnectionRef.current && data.candidate) {
-        try {
-          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-        } catch (error) {
-          handleWebRTCError(error, 'adding ICE candidate');
-        }
-      }
-    });
-
-    // Handle admin joined
-    socketRef.current.on('user-joined', (userId) => {
-      console.log('Admin joined:', userId);
-      setMembers(prev => {
-        if (!prev.includes(userId)) {
-          return [...prev, userId];
-        }
-        return prev;
-      });
-
-      showNotificationPopup('Admin joined the room');
-
-      // Update connection status if we have remote streams
-      if (Object.keys(remoteStreams).length > 0) {
-        setIsConnected(true);
-      }
-
-      // Create offer immediately when admin joins (admin-mentor 1-on-1 logic)
-      console.log('Admin-mentor call detected, creating offer immediately for user:', userId);
-      setTimeout(() => {
-        if (isComponentMountedRef.current && localStream && peerConnectionRef.current) {
-          createOffer(userId);
-        }
-      }, 500);
-    });
-
-    // Handle admin left
-    socketRef.current.on('user-left', (userId) => {
-      console.log('Admin left:', userId);
-      setIsConnected(false);
-      setCallAccepted(false);
-      setIsCalling(false);
-      setRemoteStreams(prev => {
-        const newStreams = { ...prev };
-        delete newStreams['remote']; // Remove the remote stream
-        return newStreams;
-      });
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
-      }
-      showNotificationPopup('Admin left the room');
-      setOtherParticipant(prev => ({ ...prev, hasVideo: false }));
-      setMembers(prev => prev.filter(member => member !== userId));
-      console.log('Admin left, isConnected set to false');
-    });
-
-    // Handle chat messages
-    socketRef.current.on('message', (data) => {
-      console.log('Received message:', data);
-      if (data && data.message) {
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          text: data.message.text || '',
-          sender: data.sender || data.message.sender || '',
-          timestamp: data.message.timestamp || new Date().toLocaleTimeString(),
-          isOwn: (data.sender || data.message.sender) === socketRef.current.id
-        }]);
-      }
+      setError('Failed to connect to signaling server. Please make sure the server is running on port 5000.');
     });
   };
 
   const initializeMedia = async () => {
-    if (!isComponentMountedRef.current) {
-      console.log('Component unmounted, skipping media initialization');
-      return;
-    }
-
-    console.log('initializeMedia called, localStream:', !!localStream, 'isInitializingRef:', isInitializingRef.current);
-
-    if (localStream) {
-      console.log('Local stream already initialized');
-      return;
-    }
-
-    if (isInitializingRef.current) {
-      console.log('Media initialization already in progress');
-      return;
-    }
-
-    isInitializingRef.current = true;
-
     try {
       console.log('Initializing media devices...');
-      const constraints = getMediaConstraints();
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }, 
+        audio: { 
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
       if (!isComponentMountedRef.current) {
-        console.log('Component unmounted during async operation, stopping stream tracks');
         stream.getTracks().forEach(track => track.stop());
-        isInitializingRef.current = false;
         return;
       }
-
-      console.log('Media stream acquired, checking if localStream already set:', !!localStream);
-
-      if (localStream) {
-        console.log('Local stream was set during async operation, stopping new stream tracks');
-        stream.getTracks().forEach(track => track.stop());
-        isInitializingRef.current = false;
-        return;
-      }
-
+      
       console.log('Media stream acquired:', stream);
       setLocalStream(stream);
-
+      
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(error => {
           console.log('Auto-play prevented for local video:', error);
         });
       }
+      
+      // If there's already a remote user connected, initiate a call
+      if (remoteSocketId) {
+        setTimeout(() => {
+          handleCallUser();
+        }, 1000);
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      if (isComponentMountedRef.current) {
+        console.error('Error accessing media devices:', error);
+        setError('Failed to access camera/microphone. Please check permissions.');
+      }
+      setLoading(false);
+    }
+  };
 
-      console.log('Creating peer connection...');
-      const pc = createPeerConnection();
-      peerConnectionRef.current = pc;
+  const handleCallUser = useCallback(async () => {
+    if (!remoteSocketId || !localStream) {
+      console.log("Cannot call user: missing remoteSocketId or localStream");
+      return;
+    }
+    
+    console.log("Calling user", remoteSocketId);
+    try {
+      console.log("Creating offer");
+      const offer = await peer.getOffer();
+      console.log("Sending offer to", remoteSocketId);
+      socketRef.current.emit("user:call", { to: remoteSocketId, offer });
+    } catch (error) {
+      console.error("Error creating offer:", error);
+    }
+  }, [remoteSocketId, localStream]);
 
-      addStreamToPeerConnection(pc, stream);
+  const handleIncomingCall = useCallback(async ({ from, offer }) => {
+    setRemoteSocketId(from);
+    
+    // Only get media stream if we don't have one yet
+    let stream = localStream;
+    if (!stream) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+      
+      setLocalStream(stream);
+      
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(error => {
+          console.log('Auto-play prevented for local video:', error);
+        });
+      }
+    }
+    
+    console.log(`Incoming Call`, from, offer);
+    const ans = await peer.getAnswer(offer);
+    socketRef.current.emit("call:accepted", { to: from, ans });
+    
+    // Send our streams after accepting the call
+    setTimeout(() => {
+      sendStreams();
+    }, 1000);
+  }, [localStream]);
 
-      // Handle remote stream
-      pc.ontrack = (event) => {
-        console.log('Received remote stream from:', event.streams[0].id);
-        const remoteStream = event.streams[0];
+  const sendStreams = useCallback(() => {
+    if (!localStream || !peer || !peer.peer) {
+      console.log("Cannot send streams: missing localStream or peer connection");
+      return;
+    }
+    
+    console.log("Sending streams to peer connection");
+    try {
+      for (const track of localStream.getTracks()) {
+        peer.peer.addTrack(track, localStream);
+      }
+      console.log("Streams sent successfully");
+    } catch (error) {
+      console.error("Error sending streams:", error);
+    }
+  }, [localStream]);
 
-        // For admin-mentor calls, use 'remote' key since it's 1-on-1
-        setRemoteStreams(prev => ({
-          ...prev,
-          'remote': remoteStream
-        }));
+  const handlePeerNegotiationNeeded = useCallback(async () => {
+    if (!remoteSocketId) return;
+    
+    const offer = await peer.getOffer();
+    socketRef.current.emit("peer:nego:needed", { offer, to: remoteSocketId });
+  }, [remoteSocketId]);
 
-        // Update connection status
-        setIsConnected(true);
-        setCallAccepted(true); // Automatically accept call when we receive a stream
-        console.log('Connection established, isConnected set to true');
-      };
-
-      // Handle ICE candidates
-      pc.onicecandidate = (event) => {
-        if (event.candidate && socketRef.current) {
-          // Broadcast ICE candidates to room for admin-mentor calls
-          console.log('Broadcasting ICE candidate to room for admin-mentor call');
-          socketRef.current.emit('ice-candidate', {
-            roomId: code,
-            candidate: event.candidate
+  // Set up peer connection event listeners
+  useEffect(() => {
+    if (!peer || !peer.peer) return;
+    
+    const handleTrack = async (ev) => {
+      console.log("Received track event:", ev);
+      const remoteStream = ev.streams;
+      console.log("GOT TRACKS!!", remoteStream);
+      
+      if (remoteStream && remoteStream[0]) {
+        setRemoteStream(remoteStream[0]);
+        
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = remoteStream[0];
+          remoteVideoRef.current.play().catch(error => {
+            console.log('Auto-play prevented for remote video:', error);
           });
         }
-      };
-
-      // Handle connection state changes
-      pc.onconnectionstatechange = () => {
-        console.log('Connection state:', pc.connectionState);
-        if (pc.connectionState === 'connected') {
-          setIsConnected(true);
-          console.log('Connection established via state change, isConnected set to true');
-        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-          setIsConnected(false);
-          console.log('Connection lost via state change, isConnected set to false');
-        }
-      };
-
-      // Handle ICE connection state changes
-      pc.oniceconnectionstatechange = () => {
-        console.log('ICE connection state:', pc.iceConnectionState);
-        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-          setIsConnected(false);
-          console.log('ICE connection lost, isConnected set to false');
-        } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-          setIsConnected(true);
-          console.log('ICE connection established, isConnected set to true');
-        }
-      };
-
-      // If there are already users in the room, initiate calls
-      if (members.length > 0) {
-        members.forEach(userId => {
-          console.log('Creating offer for existing user:', userId);
-          setTimeout(() => {
-            if (isComponentMountedRef.current) {
-              createOffer(userId);
-            }
-          }, 1500);
-        });
+        
+        setIsConnected(true);
       }
-
-    } catch (error) {
-      if (isComponentMountedRef.current) {
-        handleWebRTCError(error, 'initializing media');
-        setError(`Failed to access camera/microphone: ${error.message}. Please check permissions.`);
-      }
-      isInitializingRef.current = false;
-    } finally {
-      if (isComponentMountedRef.current) {
-        setLoading(false);
-      }
-    }
-  };
-
-  const createOffer = async (targetUserId) => {
-    if (!isComponentMountedRef.current) {
-      console.log('Component unmounted, skipping offer creation');
-      return;
-    }
-
-    if (!peerConnectionRef.current) {
-      console.log('Peer connection not ready yet');
-      return;
-    }
-
-    if (peerConnectionRef.current.localDescription) {
-      console.log('Local description already exists, skipping offer creation');
-      return;
-    }
-
-    try {
-      console.log('Creating offer for:', targetUserId);
-      const offer = await peerConnectionRef.current.createOffer();
-      await peerConnectionRef.current.setLocalDescription(offer);
-
-      if (socketRef.current) {
-        // Broadcast offer to room for admin-mentor calls
-        socketRef.current.emit('offer', {
-          roomId: code,
-          offer: offer
-        });
-        console.log('Offer broadcast to room for admin-mentor call');
-      }
-    } catch (error) {
-      if (isComponentMountedRef.current) {
-        handleWebRTCError(error, 'creating offer');
-      }
-    }
-  };
+    };
+    
+    const handleNegotiationNeeded = async () => {
+      console.log("Negotiation needed");
+      handlePeerNegotiationNeeded();
+    };
+    
+    console.log("Adding event listeners to peer connection");
+    peer.peer.addEventListener("track", handleTrack);
+    peer.peer.addEventListener("negotiationneeded", handleNegotiationNeeded);
+    
+    return () => {
+      console.log("Removing event listeners from peer connection");
+      peer.peer.removeEventListener("track", handleTrack);
+      peer.peer.removeEventListener("negotiationneeded", handleNegotiationNeeded);
+    };
+  }, [handlePeerNegotiationNeeded]);
 
   const toggleMute = () => {
     if (localStream) {
@@ -467,25 +344,35 @@ export default function InterviewSession() {
   };
 
   const endCall = () => {
-    closeConnection(peerConnectionRef.current, localStream);
-
+    // Clean up WebRTC connection
+    if (peer && peer.peer) {
+      try {
+        peer.peer.close();
+      } catch (e) {
+        console.log('Error closing peer connection:', e);
+      }
+    }
+    
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+    }
+    
     if (socketRef.current) {
-      socketRef.current.emit('leave-room', code);
       socketRef.current.disconnect();
     }
+    
     navigate('/dashboard');
   };
 
   const sendMessage = () => {
-    if (newMessage.trim() && socketRef.current) {
+    // For now, we'll just add to local messages since we don't have a chat server
+    if (newMessage.trim()) {
       const messageData = {
         text: newMessage,
-        sender: socketRef.current.id,
+        sender: "You",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };
-
-      socketRef.current.emit('message', { roomId: code, message: messageData });
-
+      
       setMessages(prev => [...prev, {
         id: Date.now(),
         text: newMessage,
@@ -493,7 +380,7 @@ export default function InterviewSession() {
         timestamp: messageData.timestamp,
         isOwn: true
       }]);
-
+      
       setNewMessage("");
     }
   };
@@ -512,22 +399,6 @@ export default function InterviewSession() {
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
   }, [messages]);
-
-  // Update remote video when remoteStreams changes
-  useEffect(() => {
-    if (remoteVideoRef.current) {
-      if (Object.keys(remoteStreams).length > 0) {
-        // Set the remote video srcObject to the remote stream
-        const remoteStream = remoteStreams['remote'];
-        remoteVideoRef.current.srcObject = remoteStream;
-        remoteVideoRef.current.play().catch(error => {
-          console.log('Auto-play prevented for remote video:', error);
-        });
-      } else {
-        remoteVideoRef.current.srcObject = null;
-      }
-    }
-  }, [remoteStreams]);
 
   if (loading) {
     return (
@@ -607,7 +478,7 @@ export default function InterviewSession() {
           <div className="h-full bg-black flex items-center justify-center">
             <div className="relative w-full h-full flex items-center justify-center">
               {/* Remote Video Container */}
-              {Object.keys(remoteStreams).length > 0 ? (
+              {remoteStream ? (
                 <video
                   ref={remoteVideoRef}
                   autoPlay
@@ -621,13 +492,13 @@ export default function InterviewSession() {
                       <div className="bg-gray-700 rounded-full w-32 h-32 flex items-center justify-center mx-auto mb-4">
                         <User className="h-16 w-16 text-gray-400" />
                       </div>
-                      {!isConnected && (
+                      {!isConnected && !remoteSocketId && (
                         <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-yellow-500 text-white text-xs px-2 py-1 rounded flex items-center">
                           <AlertCircle className="h-3 w-3 mr-1" />
                           Waiting
                         </div>
                       )}
-                      {isConnected && (
+                      {(isConnected || remoteSocketId) && (
                         <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 bg-green-500 text-white text-xs px-2 py-1 rounded flex items-center">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Connected
@@ -636,7 +507,7 @@ export default function InterviewSession() {
                     </div>
                     <h3 className="text-xl font-bold text-white mb-2">Admin</h3>
                     <p className="text-gray-400 mb-4">
-                      {isConnected ? 'Video feed will appear here' : 'Waiting for admin to join...'}
+                      {(isConnected || remoteSocketId) ? 'Video feed will appear here' : 'Waiting for admin to join...'}
                     </p>
                   </div>
                 </div>

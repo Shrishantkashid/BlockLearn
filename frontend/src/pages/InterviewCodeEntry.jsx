@@ -1,12 +1,29 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { validateInterviewCode } from "../api";
+import { validateInterviewCode, fetchUserProfile } from "../api";
 
 function InterviewCodeEntry() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [userType, setUserType] = useState(null);
   const navigate = useNavigate();
+
+  // Get user type on component mount
+  useEffect(() => {
+    const getUserType = async () => {
+      try {
+        const response = await fetchUserProfile();
+        if (response.success && response.user) {
+          setUserType(response.user.userType);
+        }
+      } catch (err) {
+        console.error("Error fetching user profile:", err);
+      }
+    };
+    
+    getUserType();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,8 +35,16 @@ function InterviewCodeEntry() {
       const response = await validateInterviewCode(code);
       
       if (response.data.success) {
-        // Navigate to the interview session within the app
-        window.location.href = response.data.meetingLink;
+        // Determine which meeting link to use based on user type
+        let meetingLink;
+        if (userType === 'admin' && response.data.adminMeetingLink) {
+          meetingLink = response.data.adminMeetingLink;
+        } else {
+          meetingLink = response.data.meetingLink;
+        }
+        
+        // Redirect to the appropriate meeting link
+        window.location.href = meetingLink;
       } else {
         setError(response.data.message || "Invalid interview code");
       }

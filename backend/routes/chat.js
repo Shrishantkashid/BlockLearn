@@ -1,6 +1,6 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
-const { connectDB } = require("../config/database");
+const { getDB } = require("../config/database");
 const OpenAI = require("openai");
 const { translate, getTranslatedResponse } = require("../utils/translation");
 
@@ -99,7 +99,7 @@ const getTranslatedRuleResponse = (message, language) => {
 const getUserContext = async (userId) => {
   try {
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
     const userSkillsCollection = db.collection('user_skills');
@@ -358,7 +358,7 @@ router.post("/conversation", authenticateToken, async (req, res) => {
     const { title } = req.body;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const collection = db.collection('chat_conversations');
 
     const newConversation = {
@@ -400,7 +400,7 @@ router.post("/message", authenticateToken, async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const conversationsCollection = db.collection('chat_conversations');
     const messagesCollection = db.collection('chat_messages');
 
@@ -483,7 +483,7 @@ router.get("/conversations", authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const conversationsCollection = db.collection('chat_conversations');
     const messagesCollection = db.collection('chat_messages');
 
@@ -526,7 +526,7 @@ router.get("/conversation/:conversation_id", authenticateToken, async (req, res)
     const userId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const conversationsCollection = db.collection('chat_conversations');
     const messagesCollection = db.collection('chat_messages');
 
@@ -573,7 +573,7 @@ router.put("/conversation/:conversation_id/close", authenticateToken, async (req
     const userId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const collection = db.collection('chat_conversations');
 
     const result = await collection.updateOne(

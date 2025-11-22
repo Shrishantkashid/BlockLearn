@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Simple WebRTC Call</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        video {
+            width: 45%;
+            border: 1px solid #ccc;
+            margin: 5px;
+        }
+
+        #controls {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Simple WebRTC Video Call (2 users)</h2>
+
+    <div id="controls">
+        Room ID:
+        <input id="roomInput" value="room1" />
+        <button id="joinBtn">Join Room</button>
+        <button id="startCallBtn" disabled>Start Call</button>
+    </div>
+
+    <div>
+        <h3>Local Video</h3>
+        <video id="localVideo" autoplay playsinline muted></video>
+
+        <h3>Remote Video</h3>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <!-- Include Socket.IO client library -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="client.js"></script>
+</body>
+
+</html>

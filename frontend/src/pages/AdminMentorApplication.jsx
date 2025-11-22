@@ -96,9 +96,20 @@ export default function AdminMentorApplication() {
   };
 
   const joinInterview = () => {
+    console.log('Application data:', application);
     if (application && application.interview) {
-      // In a real implementation, this would navigate to the interview session
-      alert(`Joining interview session: ${application.interview._id}`);
+      console.log('Interview data:', application.interview);
+      if (application.interview.admin_meeting_link) {
+        console.log('Redirecting to admin meeting link:', application.interview.admin_meeting_link);
+        // Redirect admin directly to the admin meeting link
+        window.location.assign(application.interview.admin_meeting_link);
+      } else {
+        console.log('Admin meeting link not available in interview data');
+        alert("Admin meeting link not available. Please try again.");
+      }
+    } else {
+      console.log('Interview data not available');
+      alert("Interview data not available. Please try again.");
     }
   };
 
@@ -337,20 +348,30 @@ export default function AdminMentorApplication() {
               </div>
               <div className="sm:col-span-3">
                 <label className="block text-sm font-medium text-gray-500 dark:text-slate-400 mb-1">
-                  Meeting Link
+                  Admin Meeting Link
                 </label>
                 <p className="text-gray-900 dark:text-slate-100 break-all">
-                  {application.interview.meeting_link}
+                  {application.interview.admin_meeting_link || 'Not available'}
                 </p>
               </div>
               <div className="sm:col-span-3">
-                <button
-                  onClick={joinInterview}
+                <label className="block text-sm font-medium text-gray-500 dark:text-slate-400 mb-1">
+                  Mentor Meeting Link
+                </label>
+                <p className="text-gray-900 dark:text-slate-100 break-all">
+                  {application.interview.meeting_link || 'Not available'}
+                </p>
+              </div>
+              <div className="sm:col-span-3">
+                <a
+                  href={application.interview.admin_meeting_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 >
                   <Video className="w-4 h-4 mr-2" />
-                  Join Interview
-                </button>
+                  Join Interview as Admin
+                </a>
               </div>
             </div>
           ) : (

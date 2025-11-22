@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { connectDB } = require('../config/database');
+const { getDB } = require('../config/database');
 const { ObjectId } = require('mongodb');
 
 const authenticateToken = async (req, res, next) => {
@@ -31,7 +31,7 @@ const authenticateToken = async (req, res, next) => {
     console.log('Decoded token:', decoded);
     
     // Verify user still exists
-    const db = await connectDB();
+    const db = await getDB();
     const collection = db.collection('users');
     
     // Check if userId is valid

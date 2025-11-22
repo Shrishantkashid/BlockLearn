@@ -1,6 +1,6 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
-const { connectDB } = require("../config/database");
+const { getDB } = require("../config/database");
 const MatchingService = require("../utils/matchingService");
 
 const router = express.Router();
@@ -19,7 +19,7 @@ router.post("/submit", authenticateToken, async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const sessionsCollection = db.collection('sessions');
     const feedbackSessionsCollection = db.collection('feedback_sessions');
 
@@ -118,7 +118,7 @@ router.get("/session/:session_id", authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const sessionsCollection = db.collection('sessions');
     const feedbackSessionsCollection = db.collection('feedback_sessions');
 
@@ -170,7 +170,7 @@ router.get("/stats/:user_id", authenticateToken, async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const sessionsCollection = db.collection('sessions');
     const feedbackSessionsCollection = db.collection('feedback_sessions');
 
@@ -252,7 +252,7 @@ router.get("/leaderboard", authenticateToken, async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
     const sessionsCollection = db.collection('sessions');

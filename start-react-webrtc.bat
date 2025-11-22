@@ -1,4 +1,4 @@
 @echo off
-echo Starting React-webRTC signaling server...
-cd React-webRTC\server
-npm start
+cd /d c:\Users\SHRI\Desktop\BlockLearn\React-webRTC\server
+node index.js
+pause

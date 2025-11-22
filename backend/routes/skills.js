@@ -1,6 +1,6 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
-const { connectDB } = require("../config/database");
+const { getDB } = require("../config/database");
 const { ObjectId } = require('mongodb');
 
 const router = express.Router();
@@ -23,7 +23,7 @@ const skills = [
 router.get("/", async (req, res) => {
   try {
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const skillsCollection = db.collection('skills');
     
     // Get all skills from database
@@ -48,7 +48,7 @@ router.get("/user", authenticateToken, async (req, res) => {
     const userId = req.user.id;
     
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const userSkillsCollection = db.collection('user_skills');
     const skillsCollection = db.collection('skills');
     
@@ -92,7 +92,7 @@ router.post("/user", authenticateToken, async (req, res) => {
     }
     
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const userSkillsCollection = db.collection('user_skills');
     
     // Add or update user skill
@@ -138,7 +138,7 @@ router.delete("/user/:skillId/:skillType", authenticateToken, async (req, res) =
     }
     
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const userSkillsCollection = db.collection('user_skills');
     
     // Remove user skill

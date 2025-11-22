@@ -1,6 +1,6 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { connectDB } = require('../config/database');
+const { getDB } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
@@ -20,7 +20,7 @@ router.post("/connect", authenticateToken, async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const mentorConnectionsCollection = db.collection('mentor_connections');
 
@@ -99,7 +99,7 @@ router.get("/connections", authenticateToken, async (req, res) => {
     const mentorId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const mentorConnectionsCollection = db.collection('mentor_connections');
     const usersCollection = db.collection('users');
 
@@ -161,7 +161,7 @@ router.post("/accept/:connectionId", authenticateToken, async (req, res) => {
     const mentorId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const mentorConnectionsCollection = db.collection('mentor_connections');
     const usersCollection = db.collection('users');
 
@@ -221,7 +221,7 @@ router.post("/reject/:connectionId", authenticateToken, async (req, res) => {
     const mentorId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const mentorConnectionsCollection = db.collection('mentor_connections');
     const usersCollection = db.collection('users');
 
@@ -280,7 +280,7 @@ router.get("/learner-connections", authenticateToken, async (req, res) => {
     const learnerId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const mentorConnectionsCollection = db.collection('mentor_connections');
     const usersCollection = db.collection('users');
 

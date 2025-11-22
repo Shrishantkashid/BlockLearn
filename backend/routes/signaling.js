@@ -6,6 +6,10 @@ const router = express.Router();
 // Store socket.io instance
 let io;
 
+// Store email to socket ID mapping
+const emailToSocketIdMap = new Map();
+const socketidToEmailMap = new Map();
+
 // Initialize socket.io
 const initializeSocket = (server) => {
   console.log('Initializing Socket.IO server...');
@@ -52,6 +56,54 @@ const initializeSocket = (server) => {
 
   io.on('connection', (socket) => {
     console.log('User connected to Socket.IO:', socket.id);
+
+    // Handle room join
+    socket.on("room:join", (data) => {
+      const { email, room } = data;
+      emailToSocketIdMap.set(email, socket.id);
+      socketidToEmailMap.set(socket.id, email);
+      socket.join(room);
+      
+      // Notify others in the room that a new user has joined
+      socket.to(room).emit("user:joined", { email, id: socket.id });
+      
+      // Notify the new user about existing users in the room
+      const socketsInRoom = io.sockets.adapter.rooms.get(room);
+      if (socketsInRoom) {
+        const otherUsers = Array.from(socketsInRoom).filter(id => id !== socket.id);
+        otherUsers.forEach(otherSocketId => {
+          const otherEmail = socketidToEmailMap.get(otherSocketId);
+          if (otherEmail) {
+            socket.emit("user:joined", { email: otherEmail, id: otherSocketId });
+          }
+        });
+      }
+      
+      // Confirm room join to the user
+      io.to(socket.id).emit("room:join", data);
+    });
+
+    // Handle user call
+    socket.on("user:call", ({ to, offer }) => {
+      io.to(to).emit("incomming:call", { from: socket.id, offer });
+    });
+
+    // Handle call accepted
+    socket.on("call:accepted", ({ to, ans }) => {
+      io.to(to).emit("call:accepted", { from: socket.id, ans });
+    });
+
+    // Handle peer negotiation needed
+    socket.on("peer:nego:needed", ({ to, offer }) => {
+      console.log("peer:nego:needed", offer);
+      io.to(to).emit("peer:nego:needed", { from: socket.id, offer });
+    });
+
+    // Handle peer negotiation done
+    socket.on("peer:nego:done", ({ to, ans }) => {
+      console.log("peer:nego:done", ans);
+      io.to(to).emit("peer:nego:final", { from: socket.id, ans });
+    });
 
     // Handle offer
     socket.on('offer', (data) => {
@@ -256,6 +308,13 @@ const initializeSocket = (server) => {
     // Handle disconnect
     socket.on('disconnect', (reason) => {
       console.log('User disconnected from Socket.IO:', socket.id, 'Reason:', reason);
+      // Remove from maps
+      const email = socketidToEmailMap.get(socket.id);
+      if (email) {
+        emailToSocketIdMap.delete(email);
+        socketidToEmailMap.delete(socket.id);
+      }
+      
       // Notify others in the same rooms
       socket.rooms.forEach(roomId => {
         if (roomId !== socket.id) {

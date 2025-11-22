@@ -29,20 +29,12 @@ import MentorSessions from "./pages/MentorSessions.jsx";
 
 // Interview pages
 import InterviewCodeEntry from "./pages/InterviewCodeEntry.jsx";
-import InterviewSession from "./pages/InterviewSession.jsx";
 
 // Live session pages
 import LiveSession from "./pages/LiveSession.jsx";
 
 // Mentor-Admin video call pages
-import MentorAdminVideoCall from "./pages/MentorAdminVideoCall.jsx";
 import MentorAdminCallLanding from "./pages/MentorAdminCallLanding.jsx";
-
-// Mentor-Student video call pages
-import MentorStudentVideoCall from "./pages/MentorStudentVideoCall.jsx";
-
-// WebRTC test page
-import WebRTCTest from "./pages/WebRTCTest.jsx";
 
 // Protected Route component
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -53,15 +45,18 @@ import TestWebSocket from "./test-websocket.jsx";
 // Import the admin login page
 import AdminLogin from "./pages/AdminLogin.jsx";
 
-// Import the admin interview session page
-import AdminInterviewSession from "./pages/AdminInterviewSession.jsx";
-
 // Import the schedule session page
 import ScheduleSession from "./pages/ScheduleSession.jsx";
 
 // Import the mutual session booking pages
 import MentorSessionBookingPage from "./pages/MentorSessionBookingPage.jsx";
 import LearnerSessionBookingPage from "./pages/LearnerSessionBookingPage.jsx";
+
+// Import the Jitsi test page
+import JitsiTestPage from "./pages/JitsiTestPage.jsx";
+
+// Import the video call page
+import VideoCallPage from "./pages/VideoCallPage.jsx";
 
 function App() {
   return (
@@ -84,11 +79,6 @@ function App() {
       <Route path="/admin/dashboard" element={
         <ProtectedRoute>
           <AdminDashboard />
-        </ProtectedRoute>
-      } />
-      <Route path="/admin/interview/:code" element={
-        <ProtectedRoute>
-          <AdminInterviewSession />
         </ProtectedRoute>
       } />
       
@@ -199,12 +189,6 @@ function App() {
         </ProtectedRoute>
       } />
       
-      <Route path="/mentor/interview/:code" element={
-        <ProtectedRoute>
-          <InterviewSession />
-        </ProtectedRoute>
-      } />
-      
       {/* Live session routes */}
       <Route path="/session/live/:code" element={
         <ProtectedRoute>
@@ -213,21 +197,24 @@ function App() {
       } />
       
       {/* Mentor-Admin video call routes */}
-      <Route path="/mentor-admin-call" element={<MentorAdminVideoCall />} />
       <Route path="/mentor-admin-landing" element={<MentorAdminCallLanding />} />
       
-      {/* Mentor-Student video call routes */}
-      <Route path="/mentor-student-call" element={<MentorStudentVideoCall />} />
+      {/* Video call route */}
+      <Route path="/video-call/:roomName" element={
+        <ProtectedRoute>
+          <VideoCallPage />
+        </ProtectedRoute>
+      } />
       
-      {/* WebRTC test route */}
-      <Route path="/webrtc-test" element={<WebRTCTest />} />
-
       {/* Schedule session route */}
       <Route path="/schedule-session/:sessionId" element={
         <ProtectedRoute>
           <ScheduleSession />
         </ProtectedRoute>
       } />
+      
+      {/* Jitsi test route */}
+      <Route path="/jitsi-test" element={<JitsiTestPage />} />
       
       {/* Catch-all route - redirect to pre-login instead of index */}
       <Route path="*" element={<Navigate to="/prelogin" replace />} />

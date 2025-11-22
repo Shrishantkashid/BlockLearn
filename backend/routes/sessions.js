@@ -1,6 +1,6 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { connectDB } = require('../config/database');
+const { getDB } = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const MatchingService = require('../utils/matchingService');
 const { sendSessionScheduledEmail } = require('../config/email');
@@ -13,7 +13,7 @@ router.get("/", authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     
     // Since MongoDB doesn't support JOINs, we'll need to fetch data in multiple queries
     const sessionsCollection = db.collection('sessions');
@@ -122,7 +122,7 @@ router.post("/", authenticateToken, async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const skillsCollection = db.collection('skills');
     const sessionsCollection = db.collection('sessions');
@@ -278,7 +278,7 @@ router.get("/:session_id", authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const sessionsCollection = db.collection('sessions');
     const usersCollection = db.collection('users');
     const skillsCollection = db.collection('skills');
@@ -367,7 +367,7 @@ router.post("/generate-live-code", authenticateToken, async (req, res) => {
     }
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const sessionsCollection = db.collection('sessions');
     
     // Convert session_id to ObjectId if it's a string
@@ -438,7 +438,7 @@ router.get("/validate-live-code/:code", async (req, res) => {
     const { code } = req.params;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     
     const sessionsCollection = db.collection('sessions');
 

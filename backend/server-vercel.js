@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
-const { ExpressPeerServer } = require('peer');
+// WebRTC dependencies removed
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
 // Initialize MongoDB connection

@@ -308,14 +308,6 @@ function MentorDashboard() {
             <p className="text-yellow-700 dark:text-yellow-300">
               An interview has been scheduled for you. Please check your email for interview details.
             </p>
-            <div className="mt-4">
-              <Link 
-                to="/interview/code-entry" 
-                className="inline-block px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
-              >
-                Enter Interview Code
-              </Link>
-            </div>
           </div>
         )}
 
@@ -331,13 +323,13 @@ function MentorDashboard() {
                   <div className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
                     <span>
-                      {new Date(interview.scheduled_at).toLocaleDateString()}
+                      {new Date(interview.scheduledAt).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
                     <Clock className="w-4 h-4" />
                     <span>
-                      {new Date(interview.scheduled_at).toLocaleTimeString([], {
+                      {new Date(interview.scheduledAt).toLocaleTimeString([], {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
@@ -346,12 +338,19 @@ function MentorDashboard() {
                 </div>
               </div>
               <div className="mt-4">
-                <Link 
-                  to={interview.meeting_link}
+                <button 
+                  onClick={() => {
+                    if (interview && interview.meetingLink) {
+                      // Redirect mentor directly to the mentor meeting link
+                      window.location.href = interview.meetingLink;
+                    } else {
+                      alert("Meeting link not available. Please try again.");
+                    }
+                  }}
                   className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
                 >
                   Join Interview
-                </Link>
+                </button>
               </div>
             </div>
           </div>
@@ -368,17 +367,6 @@ function MentorDashboard() {
               <p className="text-sm text-blue-800 dark:text-blue-200">
                 <strong>Note:</strong> Check this dashboard regularly for your interview link, or watch your email for a notification 
                 with the meeting details. The interview link will appear in this section when your interview is scheduled.
-              </p>
-            </div>
-            <div className="mt-4">
-              <Link 
-                to="/interview/code-entry" 
-                className="inline-block px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                Enter Interview Code
-              </Link>
-              <p className="text-sm text-gray-600 dark:text-slate-400 mt-2">
-                If you have received your interview code, click above to enter it and join your session.
               </p>
             </div>
           </div>

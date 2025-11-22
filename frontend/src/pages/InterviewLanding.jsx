@@ -10,11 +10,10 @@ function InterviewLanding() {
   const handleJoinInterview = (e) => {
     e.preventDefault();
     if (interviewCode.trim()) {
-      if (userType === "admin") {
-        navigate(`/admin/interview/${interviewCode.trim()}`);
-      } else {
-        navigate(`/mentor/interview/${interviewCode.trim()}`);
-      }
+      // TODO: Implement interview joining logic
+      console.log('Join interview with code:', interviewCode.trim(), 'as', userType);
+      // For now, just show an alert
+      alert('Interview functionality has been removed. You will implement your own interview call feature.');
     }
   };
 

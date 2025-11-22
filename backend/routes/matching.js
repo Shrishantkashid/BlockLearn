@@ -1,6 +1,6 @@
 const express = require("express");
 const { authenticateToken } = require("../middleware/auth");
-const { connectDB } = require("../config/database");
+const { getDB } = require("../config/database");
 const { ObjectId } = require('mongodb');
 const MatchingService = require("../utils/matchingService");
 
@@ -91,7 +91,7 @@ async function calculateMatchScore(student, mentor, sessionRequest) {
  */
 async function calculateSkillMatch(studentId, mentorId, skillId) {
   // Get database connection
-  const db = await connectDB();
+  const db = await getDB();
   const userSkillsCollection = db.collection('user_skills');
 
   // Check if mentor offers this skill
@@ -178,7 +178,7 @@ function calculateAvailabilityOverlap(studentAvailability, mentorAvailability) {
  */
 async function calculateExperienceMatch(mentorId, skillId) {
   // Get database connection
-  const db = await connectDB();
+  const db = await getDB();
   const sessionsCollection = db.collection('sessions');
 
   // Count completed sessions for this skill
@@ -203,7 +203,7 @@ async function calculateExperienceMatch(mentorId, skillId) {
  */
 async function calculateRatingScore(mentorId) {
   // Get database connection
-  const db = await connectDB();
+  const db = await getDB();
   const sessionsCollection = db.collection('sessions');
   const feedbackSessionsCollection = db.collection('feedback_sessions');
 
@@ -221,7 +221,7 @@ router.get("/mentors/:skillId", authenticateToken, async (req, res) => {
     const studentId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
     const userSkillsCollection = db.collection('user_skills');
@@ -342,7 +342,7 @@ router.get("/match-detail/:mentorId/:skillId", authenticateToken, async (req, re
     const studentId = req.user.id;
 
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
 
@@ -459,7 +459,7 @@ router.get("/mentors-advanced", authenticateToken, async (req, res) => {
     }
     
     // Get database connection
-    const db = await connectDB();
+    const db = await getDB();
     const usersCollection = db.collection('users');
     const profilesCollection = db.collection('user_profiles');
     const userSkillsCollection = db.collection('user_skills');

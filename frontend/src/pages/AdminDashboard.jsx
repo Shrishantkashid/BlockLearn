@@ -34,8 +34,8 @@ function AdminDashboard() {
   };
 
   const handleJoinInterview = (code) => {
-    // Navigate to the interview session within the app
-    navigate(`/admin/interview/${code}`);
+    // Redirect to the interview code entry page with the interview code
+    navigate(`/interview/code-entry`);
   };
 
   const handleCodeSubmit = (e) => {

@@ -35,8 +35,10 @@ export default function MentorInterviewPending() {
 
   // Function to join the interview session
   const joinInterview = () => {
-    // In a real implementation, this would use the actual session ID
-    navigate("/mentor/interview/INT-2025-001");
+    // TODO: Implement interview joining logic
+    console.log('Join interview');
+    // For now, just show an alert
+    alert('Interview functionality has been removed. You will implement your own interview call feature.');
   };
 
   return (
