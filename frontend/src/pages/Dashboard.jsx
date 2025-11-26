@@ -164,7 +164,7 @@ const Dashboard = () => {
             <div className="flex items-center gap-4">
               <span className="text-gray-600 dark:text-slate-300 text-sm truncate max-w-32">{displayName}</span>
               <button 
-                onClick={handleViewProfile}
+                onClick={() => navigate('/learner/mentors')}
                 className="text-gray-600 dark:text-slate-300 hover:text-primary transition-colors"
               >
                 <User className="w-5 h-5" />
@@ -198,12 +198,12 @@ const Dashboard = () => {
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <button 
-            onClick={handleViewProfile}
+            onClick={() => navigate('/learner/mentors')}
             className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow text-left"
           >
             <User className="w-8 h-8 text-primary mb-4" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">View Profile</h3>
-            <p className="text-gray-600 dark:text-slate-400">See your profile details and information</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">View Mentors</h3>
+            <p className="text-gray-600 dark:text-slate-400">See your connected mentors</p>
           </button>
 
           <Link to="/match" className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow">

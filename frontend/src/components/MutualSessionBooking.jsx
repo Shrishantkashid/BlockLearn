@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Calendar, Clock, MapPin, MessageSquare, User, CheckCircle, Bell } from 'lucide-react';
+import { Send, Calendar, Clock, MapPin, MessageSquare, User, CheckCircle, Bell, Video } from 'lucide-react';
 import api from '../api';
 import { io } from 'socket.io-client';
 
@@ -15,6 +15,7 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
   const [newMessage, setNewMessage] = useState('');
   const [proposedTimes, setProposedTimes] = useState([]);
   const [notification, setNotification] = useState(null);
+  const [jitsiLink, setJitsiLink] = useState(null);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
@@ -160,6 +161,22 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
       if (onSessionScheduled) {
         onSessionScheduled(data);
       }
+    });
+
+    // Handle Jitsi link event
+    socketRef.current.on('jitsi-link', (data) => {
+      console.log('Jitsi link received:', data);
+      setJitsiLink(data.meetingLink);
+      
+      // Add Jitsi link message to chat
+      const jitsiMessage = {
+        id: messages.length + 1,
+        sender: 'system',
+        text: `Join your video call: ${data.meetingLink}`,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, jitsiMessage]);
     });
 
     // Clean up on unmount
@@ -352,6 +369,23 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
       const response = await api.post('/api/sessions', sessionData);
       
       if (response.data.success) {
+        // Generate Jitsi meeting link
+        const jitsiRoomName = crypto.randomUUID();
+        const meetingLink = `https://meet.jit.si/${jitsiRoomName}`;
+        
+        // Store the Jitsi link
+        setJitsiLink(meetingLink);
+        
+        // Broadcast Jitsi link through socket
+        if (socketRef.current) {
+          const jitsiData = {
+            meetingLink: meetingLink,
+            jitsiRoomName: jitsiRoomName,
+            roomId: roomId
+          };
+          socketRef.current.emit('jitsi-link', jitsiData);
+        }
+        
         // Broadcast session scheduled event through socket with video call details
         if (socketRef.current) {
           const scheduleData = {
@@ -361,7 +395,7 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
             notes: `Session automatically scheduled from accepted proposal on ${scheduledDate.toLocaleString()}`,
             roomId: roomId, // Use the deterministic room ID
             live_session_code: response.data.data.live_session_code,
-            meeting_link: response.data.data.meeting_link
+            meeting_link: meetingLink
           };
           socketRef.current.emit('session-scheduled', scheduleData);
         }
@@ -370,6 +404,12 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
       }
     } catch (error) {
       console.error('Error auto-scheduling session:', error);
+    }
+  };
+
+  const handleJoinVideoCall = () => {
+    if (jitsiLink) {
+      window.open(jitsiLink, '_blank');
     }
   };
 
@@ -391,11 +431,22 @@ const MutualSessionBooking = ({ sessionId, mentor, student, skill, currentUser, 
 
       {/* Chat Header */}
       <div className="bg-primary dark:bg-primary/90 p-4">
-        <div className="flex items-center">
-          <MessageSquare className="w-5 h-5 text-white mr-2" />
-          <h3 className="text-lg font-semibold text-white">
-            Schedule Session: {skill.name}
-          </h3>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <MessageSquare className="w-5 h-5 text-white mr-2" />
+            <h3 className="text-lg font-semibold text-white">
+              Schedule Session: {skill.name}
+            </h3>
+          </div>
+          {jitsiLink && (
+            <button
+              onClick={handleJoinVideoCall}
+              className="flex items-center px-3 py-1 bg-white text-primary rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
+            >
+              <Video className="w-4 h-4 mr-1" />
+              Join Call
+            </button>
+          )}
         </div>
         <p className="text-primary-100 text-sm mt-1">
           with {mentor.first_name} {mentor.last_name}

@@ -5,7 +5,6 @@ import api from "../api";
 import FeedbackModal from "../components/FeedbackModal";
 import LiveSessionModal from "../components/LiveSessionModal";
 import LiveSessionCode from "../components/LiveSessionCode";
-import MutualSessionBooking from "../components/MutualSessionBooking";
 import io from 'socket.io-client';
 
 const Sessions = () => {
@@ -25,11 +24,6 @@ const Sessions = () => {
     session: null
   });
   const [generatedLiveSession, setGeneratedLiveSession] = useState(null);
-  const [showSchedulingChat, setShowSchedulingChat] = useState(false);
-  const [selectedMentor, setSelectedMentor] = useState(null);
-  const [selectedSkill, setSelectedSkill] = useState(null);
-  const [preSelectedMentor, setPreSelectedMentor] = useState(null);
-  const [preSelectedSkill, setPreSelectedSkill] = useState(null);
   const navigate = useNavigate();
   const [socket, setSocket] = useState(null);
 
@@ -47,11 +41,21 @@ const Sessions = () => {
       fetchUserSessions();
     });
     
-    // Clean up socket connection
+    // Listen for session created events from WebRTC chat
+    const handleSessionCreated = (event) => {
+      console.log('Session created event received:', event.detail);
+      // Refresh sessions list when a session is created via WebRTC
+      fetchUserSessions();
+    };
+    
+    window.addEventListener('session-created', handleSessionCreated);
+    
+    // Clean up socket connection and event listener
     return () => {
       if (newSocket) {
         newSocket.disconnect();
       }
+      window.removeEventListener('session-created', handleSessionCreated);
     };
   }, []);
 
@@ -167,22 +171,6 @@ const Sessions = () => {
     navigate(`/session/live/${code}`);
   };
 
-  const handleScheduleWithMentor = (mentor, skill) => {
-    setSelectedMentor(mentor);
-    setSelectedSkill(skill);
-    setShowSchedulingChat(true);
-  };
-
-  const handleSessionScheduled = (sessionData) => {
-    // Refresh sessions list
-    fetchUserSessions();
-    // Close chat
-    setShowSchedulingChat(false);
-    // Reset selection
-    setSelectedMentor(null);
-    setSelectedSkill(null);
-  };
-
   const renderSessionCard = (session) => (
     <div key={session.id} className="card">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
@@ -276,18 +264,10 @@ const Sessions = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Your Sessions</h1>
             <p className="mt-2 text-gray-600 dark:text-slate-400">
-              Manage your upcoming and past sessions
+              View your upcoming and past sessions
             </p>
           </div>
-          <div className="mt-4 md:mt-0">
-            <Link
-              to="/learner/session-booking"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
-            >
-              <Calendar className="w-4 h-4 mr-2" />
-              Book New Session
-            </Link>
-          </div>
+          {/* Removed the "Book New Session" button as per requirement */}
         </div>
 
         {loading ? (
@@ -309,17 +289,8 @@ const Sessions = () => {
                   <Calendar className="mx-auto h-12 w-12 text-gray-400 dark:text-slate-500" />
                   <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No upcoming sessions</h3>
                   <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
-                    Get started by booking a session with a mentor.
+                    You don't have any upcoming sessions scheduled.
                   </p>
-                  <div className="mt-6">
-                    <Link
-                      to="/learner/session-booking"
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90"
-                    >
-                      <Calendar className="w-4 h-4 mr-2" />
-                      Book Your First Session
-                    </Link>
-                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -382,36 +353,6 @@ const Sessions = () => {
             onJoinSession={handleJoinLiveSession}
             onDismiss={() => setGeneratedLiveSession(null)}
           />
-        )}
-
-        {/* Session Scheduling Chat */}
-        {showSchedulingChat && selectedMentor && selectedSkill && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-              <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Schedule Session with {selectedMentor.first_name} {selectedMentor.last_name}
-                </h3>
-                <button
-                  onClick={() => setShowSchedulingChat(false)}
-                  className="text-gray-400 hover:text-gray-500 dark:text-slate-400 dark:hover:text-slate-300"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-4 overflow-y-auto max-h-[70vh]">
-                <MutualSessionBooking
-                  mentor={selectedMentor}
-                  student={JSON.parse(localStorage.getItem('userData') || '{}')}
-                  skill={selectedSkill}
-                  currentUser={JSON.parse(localStorage.getItem('userData') || '{}')}
-                  onSessionScheduled={handleSessionScheduled}
-                />
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

@@ -197,4 +197,112 @@ export async function getLearnerConnections() {
   return response.data;
 }
 
+// Session Request API endpoints
+export async function createSessionRequest(mentorId, skillId, initialMessage) {
+  try {
+    const response = await api.post('/api/session-requests', { mentorId, skillId, initialMessage });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating session request:', error);
+    throw error;
+  }
+}
+
+export async function getSessionRequests() {
+  try {
+    const response = await api.get('/api/session-requests');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching session requests:', error);
+    throw error;
+  }
+}
+
+export async function getSessionRequestMessages(sessionRequestId) {
+  try {
+    const response = await api.get(`/api/session-requests/${sessionRequestId}/messages`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching session request messages:', error);
+    throw error;
+  }
+}
+
+export async function sendSessionRequestMessage(sessionRequestId, message, messageType = 'text', metadata = {}) {
+  try {
+    const response = await api.post(`/api/session-requests/${sessionRequestId}/messages`, { 
+      message, 
+      messageType, 
+      metadata 
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending session request message:', error);
+    throw error;
+  }
+}
+
+export async function proposeSessionTime(sessionRequestId, proposedTime) {
+  try {
+    const response = await api.post(`/api/session-requests/${sessionRequestId}/proposetimes`, { proposedTime });
+    return response.data;
+  } catch (error) {
+    console.error('Error proposing session time:', error);
+    throw error;
+  }
+}
+
+export async function respondToProposal(sessionRequestId, proposalId, response) {
+  try {
+    const res = await api.post(`/api/session-requests/${sessionRequestId}/proposetimes/${proposalId}/respond`, { response });
+    return res.data;
+  } catch (error) {
+    console.error('Error responding to proposal:', error);
+    throw error;
+  }
+}
+
+export async function getSessionRequestJitsiLink(sessionRequestId) {
+  try {
+    const response = await api.get(`/api/session-requests/${sessionRequestId}/jitsilink`);
+    return response.data;
+  } catch (error) {
+    console.error('Error getting session request Jitsi link:', error);
+    throw error;
+  }
+}
+
+// WebRTC Session API endpoints
+export async function createWebRTCSession(sessionData) {
+  try {
+    const response = await api.post('/api/sessions/webrtc-simple', sessionData);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating WebRTC session:', error);
+    throw error;
+  }
+}
+
+// Session completion API endpoint
+export async function completeSession(sessionId, feedbackData) {
+  try {
+    const response = await api.post(`/api/sessions/complete/${sessionId}`, feedbackData);
+    return response.data;
+  } catch (error) {
+    console.error('Error completing session:', error);
+    throw error;
+  }
+}
+
+// Mentor leaderboard API endpoint
+export async function getMentorLeaderboard() {
+  try {
+    const response = await api.get('/api/sessions/leaderboard');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching mentor leaderboard:', error);
+    throw error;
+  }
+}
+
 export default api;

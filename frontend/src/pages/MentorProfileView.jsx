@@ -116,10 +116,10 @@ const MentorProfileView = () => {
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Error</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
           <button
-            onClick={() => navigate("/match")}
+            onClick={() => navigate("/mentor/dashboard")}
             className="btn-primary px-6 py-3"
           >
-            Back to Matching
+            Back to Dashboard
           </button>
         </div>
       </div>
@@ -138,10 +138,10 @@ const MentorProfileView = () => {
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Profile Not Found</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">No profile data available for this mentor.</p>
           <button
-            onClick={() => navigate("/match")}
+            onClick={() => navigate("/mentor/dashboard")}
             className="btn-primary px-6 py-3"
           >
-            Back to Matching
+            Back to Dashboard
           </button>
         </div>
       </div>
@@ -157,13 +157,13 @@ const MentorProfileView = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
           <div className="flex items-center space-x-4">
-            <Link
-              to="/match"
+            <button
+              onClick={() => navigate("/mentor/dashboard")}
               className="inline-flex items-center space-x-2 text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
-              <span>Back to Matching</span>
-            </Link>
+              <span>Back to Dashboard</span>
+            </button>
             <div className="hidden sm:block text-gray-300 dark:text-slate-600">|</div>
             <div className="text-sm text-gray-500 dark:text-slate-400">
               <span className="text-gray-900 dark:text-slate-100 font-medium">Mentor Profile</span>

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../api";
 import { getMentorConnections, acceptMentorConnection, rejectMentorConnection } from "../api";
-import { BookOpen, Users, Calendar, Award, Settings, LogOut, User, Clock, MessageSquare } from "lucide-react";
+import { BookOpen, Users, Calendar, Award, Settings, LogOut, User, Clock, MessageSquare, Trophy } from "lucide-react";
 
 function MentorDashboard() {
   const [user, setUser] = useState(null);
@@ -382,12 +382,6 @@ function MentorDashboard() {
                 >
                   Refresh
                 </button>
-                <Link 
-                  to="/mentor/session-booking"
-                  className="text-sm text-primary hover:text-primary/80"
-                >
-                  Book New Session
-                </Link>
               </div>
             </div>
             
@@ -455,7 +449,7 @@ function MentorDashboard() {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">
-                Upcoming Sessions
+                My Sessions
               </h2>
               <button 
                 onClick={fetchSessions}
@@ -470,53 +464,51 @@ function MentorDashboard() {
                 <div className="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary mb-2"></div>
                 <p className="text-gray-600 dark:text-slate-400">Loading sessions...</p>
               </div>
-            ) : sessions.filter(session => session.status === 'scheduled').length === 0 ? (
+            ) : sessions.length === 0 ? (
               <div className="text-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
                 <Calendar className="w-12 h-12 text-gray-300 dark:text-slate-600 mx-auto mb-4" />
                 <p className="text-gray-600 dark:text-slate-400">
-                  No upcoming sessions scheduled.
+                  No sessions booked yet.
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                {sessions
-                  .filter(session => session.status === 'scheduled')
-                  .map((session) => (
-                    <div key={session.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-slate-700 rounded-lg">
-                      <div>
-                        <h3 className="font-medium text-gray-900 dark:text-slate-100">
-                          {session.skill.name} with {session.student.first_name} {session.student.last_name}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-slate-400">
-                          {formatDate(session.scheduled_at)}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
-                          Duration: {session.duration_minutes} minutes
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 text-xs rounded-full ${getSessionStatusColor(session.status)}`}>
-                          {session.status}
-                        </span>
-                        {session.meeting_link && (
-                          <Link 
-                            to={session.meeting_link}
-                            className="px-3 py-1 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors"
-                          >
-                            Join Session
-                          </Link>
-                        )}
+                {sessions.map((session) => (
+                  <div key={session.id} className="flex items-center justify-between p-4 border border-gray-200 dark:border-slate-700 rounded-lg">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-slate-100">
+                        {session.skill.name} with {session.student.first_name} {session.student.last_name}
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-slate-400">
+                        {formatDate(session.scheduled_at)}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
+                        Duration: {session.duration_minutes} minutes
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`px-2 py-1 text-xs rounded-full ${getSessionStatusColor(session.status)}`}>
+                        {session.status}
+                      </span>
+                      {session.meeting_link && session.status === 'scheduled' && (
+                        <Link 
+                          to={session.meeting_link}
+                          className="px-3 py-1 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors"
+                        >
+                          Join Session
+                        </Link>
+                      )}
+                      {session.status === 'scheduled' && (
                         <Link 
                           to={`/mentor/session-booking/${session.id}`}
                           className="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
                         >
                           Edit Session
                         </Link>
-
-                      </div>
+                      )}
                     </div>
-                  ))
-                }
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -540,10 +532,35 @@ function MentorDashboard() {
               <p className="text-gray-600 dark:text-slate-400">Manage your mentoring sessions</p>
             </Link>
 
-            <Link to="/match" className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+            <Link to="/mentor/students" className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow">
               <Users className="w-8 h-8 text-primary mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">My Students</h3>
               <p className="text-gray-600 dark:text-slate-400">View and manage your students</p>
+            </Link>
+          </div>
+        )}
+
+        {/* Leaderboard Link */}
+        {user.mentorApproved === true && (
+          <div className="mb-8">
+            <Link 
+              to="/mentor/leaderboard" 
+              className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-700 hover:shadow-md transition-shadow block"
+            >
+              <div className="flex items-center">
+                <Trophy className="w-8 h-8 text-yellow-500 mr-4" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-1">
+                    Mentor Leaderboard
+                  </h3>
+                  <p className="text-gray-600 dark:text-slate-400">
+                    See how you rank among other mentors
+                  </p>
+                </div>
+                <div className="ml-auto text-primary">
+                  <Award className="w-6 h-6" />
+                </div>
+              </div>
             </Link>
           </div>
         )}

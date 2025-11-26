@@ -67,7 +67,14 @@ const ProfileView = () => {
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Error</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">{error}</p>
           <button
-            onClick={() => navigate("/dashboard")}
+            onClick={() => {
+              const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+              if (userData.userType === "mentor") {
+                navigate("/mentor/dashboard");
+              } else {
+                navigate("/dashboard");
+              }
+            }}
             className="btn-primary px-6 py-3"
           >
             Back to Dashboard
@@ -89,10 +96,17 @@ const ProfileView = () => {
           <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">Profile Not Found</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">No profile data available for this user.</p>
           <button
-            onClick={() => navigate("/profile")}
+            onClick={() => {
+              const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+              if (userData.userType === "mentor") {
+                navigate("/mentor/dashboard");
+              } else {
+                navigate("/dashboard");
+              }
+            }}
             className="btn-primary px-6 py-3"
           >
-            Create Profile
+            Back to Dashboard
           </button>
         </div>
       </div>
@@ -108,20 +122,34 @@ const ProfileView = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
           <div className="flex items-center space-x-4">
-            <Link
-              to="/dashboard"
+            <button
+              onClick={() => {
+                const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+                if (userData.userType === "mentor") {
+                  navigate("/mentor/dashboard");
+                } else {
+                  navigate("/dashboard");
+                }
+              }}
               className="inline-flex items-center space-x-2 text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
               <span>Back to Dashboard</span>
-            </Link>
+            </button>
             <div className="hidden sm:block text-gray-300 dark:text-slate-600">|</div>
             <div className="text-sm text-gray-500 dark:text-slate-400">
               <span className="text-gray-900 dark:text-slate-100 font-medium">Profile Details</span>
             </div>
           </div>
           <button
-            onClick={() => navigate("/profile")}
+            onClick={() => {
+              const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+              if (userData.userType === "mentor") {
+                navigate("/mentor/profile");
+              } else {
+                navigate("/profile");
+              }
+            }}
             className="btn-primary px-4 py-2 flex items-center space-x-2"
           >
             <Edit3 className="w-4 h-4" />
@@ -235,7 +263,14 @@ const ProfileView = () => {
 
             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700 flex justify-end">
               <button
-                onClick={() => navigate("/profile")}
+                onClick={() => {
+                  const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+                  if (userData.userType === "mentor") {
+                    navigate("/mentor/profile");
+                  } else {
+                    navigate("/profile");
+                  }
+                }}
                 className="btn-primary px-6 py-3 flex items-center space-x-2"
               >
                 <Edit3 className="w-4 h-4" />

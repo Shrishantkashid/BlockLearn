@@ -1,43 +1,49 @@
--- Add matching tables to existing database
--- Run this script to add the matching functionality to your existing database
-
--- Match history table for ML training data
-CREATE TABLE IF NOT EXISTS match_history (
-    id SERIAL PRIMARY KEY,
-    student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    mentor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    skill_id INTEGER REFERENCES skills(id) ON DELETE CASCADE,
-    match_score DECIMAL(3,2), -- Normalized score between 0 and 1
-    score_breakdown JSONB, -- Detailed breakdown of scoring factors
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Add session_requests table for chat-based session booking
+CREATE TABLE IF NOT EXISTS session_requests (
+    id VARCHAR(36) PRIMARY KEY,
+    student_id INTEGER NOT NULL,
+    mentor_id INTEGER NOT NULL,
+    skill_id INTEGER NOT NULL,
+    status ENUM('pending', 'accepted', 'rejected', 'scheduled') DEFAULT 'pending',
+    proposed_times JSON,
+    accepted_time DATETIME,
+    chat_room_id VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (mentor_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
 );
 
--- Session outcomes table for ML training data
-CREATE TABLE IF NOT EXISTS session_outcomes (
-    id SERIAL PRIMARY KEY,
-    session_id INTEGER REFERENCES sessions(id) ON DELETE CASCADE,
-    connected BOOLEAN, -- Whether the match led to a connection
-    feedback_data JSONB, -- Structured feedback data
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Add chat_messages table for session request discussions
+CREATE TABLE IF NOT EXISTS session_request_messages (
+    id VARCHAR(36) PRIMARY KEY,
+    session_request_id VARCHAR(36),
+    sender_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    message_type ENUM('text', 'proposal', 'system', 'jitsi_link') DEFAULT 'text',
+    metadata JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (session_request_id) REFERENCES session_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Indexes for match history
-CREATE INDEX IF NOT EXISTS idx_match_history_student_id ON match_history(student_id);
-CREATE INDEX IF NOT EXISTS idx_match_history_mentor_id ON match_history(mentor_id);
-CREATE INDEX IF NOT EXISTS idx_match_history_skill_id ON match_history(skill_id);
-CREATE INDEX IF NOT EXISTS idx_match_history_score ON match_history(match_score);
+-- Add video_call_sessions table for Jitsi integration
+CREATE TABLE IF NOT EXISTS video_call_sessions (
+    id VARCHAR(36) PRIMARY KEY,
+    session_request_id VARCHAR(36),
+    jitsi_room_name VARCHAR(255) UNIQUE,
+    meeting_link VARCHAR(500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP NULL,
+    ended_at TIMESTAMP NULL,
+    FOREIGN KEY (session_request_id) REFERENCES session_requests(id) ON DELETE CASCADE
+);
 
--- Indexes for session outcomes
-CREATE INDEX IF NOT EXISTS idx_session_outcomes_session_id ON session_outcomes(session_id);
-CREATE INDEX IF NOT EXISTS idx_session_outcomes_connected ON session_outcomes(connected);
-
--- Add match score to sessions table for tracking
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS match_score DECIMAL(3,2);
-ALTER TABLE sessions ADD COLUMN IF NOT EXISTS matched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-
--- Index for match score tracking
-CREATE INDEX IF NOT EXISTS idx_sessions_match_score ON sessions(match_score);
-
--- Analyze the new tables
-ANALYZE match_history;
-ANALYZE session_outcomes;
+-- Add indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_session_requests_student ON session_requests(student_id);
+CREATE INDEX IF NOT EXISTS idx_session_requests_mentor ON session_requests(mentor_id);
+CREATE INDEX IF NOT EXISTS idx_session_requests_status ON session_requests(status);
+CREATE INDEX IF NOT EXISTS idx_session_request_messages_request ON session_request_messages(session_request_id);
+CREATE INDEX IF NOT EXISTS idx_session_request_messages_sender ON session_request_messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_video_call_sessions_request ON video_call_sessions(session_request_id);

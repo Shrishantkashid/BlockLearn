@@ -25,11 +25,21 @@ const MentorSessions = () => {
       fetchSessions();
     });
     
-    // Clean up socket connection
+    // Listen for session created events from WebRTC chat
+    const handleSessionCreated = (event) => {
+      console.log('Session created event received:', event.detail);
+      // Refresh sessions list when a session is created via WebRTC
+      fetchSessions();
+    };
+    
+    window.addEventListener('session-created', handleSessionCreated);
+    
+    // Clean up socket connection and event listener
     return () => {
       if (newSocket) {
         newSocket.disconnect();
       }
+      window.removeEventListener('session-created', handleSessionCreated);
     };
   }, []);
 
@@ -99,15 +109,9 @@ const MentorSessions = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">My Sessions</h1>
               <p className="text-gray-600 dark:text-slate-400 mt-2">
-                Manage all your mentoring sessions
+                View all your mentoring sessions
               </p>
             </div>
-            <button
-              onClick={() => navigate('/mentor/session-booking')}
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              Schedule New Session
-            </button>
           </div>
         </div>
 

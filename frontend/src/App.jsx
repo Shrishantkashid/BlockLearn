@@ -26,6 +26,9 @@ import MentorOnboarding from "./pages/MentorOnboarding.jsx";
 import MentorDashboard from "./pages/MentorDashboard.jsx";
 import MentorProfileView from "./pages/MentorProfileView.jsx";
 import MentorSessions from "./pages/MentorSessions.jsx";
+import MentorStudents from "./pages/MentorStudents.jsx";
+import LearnerMentors from "./pages/LearnerMentors.jsx";
+import MentorLeaderboard from "./pages/MentorLeaderboard.jsx";
 
 // Interview pages
 import InterviewCodeEntry from "./pages/InterviewCodeEntry.jsx";
@@ -51,6 +54,9 @@ import ScheduleSession from "./pages/ScheduleSession.jsx";
 // Import the mutual session booking pages
 import MentorSessionBookingPage from "./pages/MentorSessionBookingPage.jsx";
 import LearnerSessionBookingPage from "./pages/LearnerSessionBookingPage.jsx";
+
+// Import session requests pages
+import SessionRequests from "./pages/SessionRequests.jsx";
 
 // Import the Jitsi test page
 import JitsiTestPage from "./pages/JitsiTestPage.jsx";
@@ -150,6 +156,24 @@ function App() {
         </ProtectedRoute>
       } />
       
+      <Route path="/mentor/students" element={
+        <ProtectedRoute>
+          <MentorStudents />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/learner/mentors" element={
+        <ProtectedRoute>
+          <LearnerMentors />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/mentor/leaderboard" element={
+        <ProtectedRoute>
+          <MentorLeaderboard />
+        </ProtectedRoute>
+      } />
+      
       <Route path="/mentor/profile/:mentorId" element={
         <ProtectedRoute>
           <MentorProfileView />
@@ -210,6 +234,13 @@ function App() {
       <Route path="/schedule-session/:sessionId" element={
         <ProtectedRoute>
           <ScheduleSession />
+        </ProtectedRoute>
+      } />
+      
+      {/* Session requests route */}
+      <Route path="/session-requests" element={
+        <ProtectedRoute>
+          <SessionRequests />
         </ProtectedRoute>
       } />
       

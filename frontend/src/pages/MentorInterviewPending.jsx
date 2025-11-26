@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
-import { Calendar, Clock, Mail, Phone, Video } from "lucide-react";
+import { Calendar, Mail, Video } from "lucide-react";
 
 export default function MentorInterviewPending() {
-  const [timeLeft, setTimeLeft] = useState({
-    days: 2,
-    hours: 14,
-    minutes: 35,
-    seconds: 22
-  });
   const [interview, setInterview] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -32,28 +26,6 @@ export default function MentorInterviewPending() {
     }
   };
 
-  // Countdown timer effect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        } else if (prev.days > 0) {
-          return { ...prev, days: prev.days - 1, hours: 23, minutes: 59, seconds: 59 };
-        } else {
-          clearInterval(timer);
-          return prev;
-        }
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, []);
-
   // Function to join the interview session
   const joinInterview = () => {
     if (interview && interview.meetingLink) {
@@ -68,17 +40,17 @@ export default function MentorInterviewPending() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-950">
+        <div className="w-32 h-32 border-b-2 rounded-full animate-spin border-primary"></div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100 mb-4">
+      <div className="max-w-4xl px-4 py-12 mx-auto sm:px-6 lg:px-8">
+        <div className="mb-10 text-center">
+          <h1 className="mb-4 text-3xl font-bold text-gray-900 dark:text-slate-100">
             Interview Scheduled
           </h1>
           <p className="text-lg text-gray-600 dark:text-slate-400">
@@ -86,20 +58,20 @@ export default function MentorInterviewPending() {
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6 sm:p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="p-6 bg-white border border-gray-200 shadow-sm dark:bg-slate-800 rounded-xl dark:border-slate-700 sm:p-8">
+          <div className="mb-8 text-center">
+            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10">
               <Calendar className="w-8 h-8 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-slate-100 mb-2">
+            <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-slate-100">
               Interview Details
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
+          <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2">
+            <div className="p-6 rounded-lg bg-gray-50 dark:bg-slate-700/50">
               <div className="flex items-center mb-4">
-                <Calendar className="w-5 h-5 text-primary mr-2" />
+                <Calendar className="w-5 h-5 mr-2 text-primary" />
                 <h3 className="font-semibold text-gray-900 dark:text-slate-100">Date & Time</h3>
               </div>
               {interview ? (
@@ -126,46 +98,36 @@ export default function MentorInterviewPending() {
               )}
             </div>
 
-            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
+            <div className="p-6 rounded-lg bg-gray-50 dark:bg-slate-700/50">
               <div className="flex items-center mb-4">
-                <Video className="w-5 h-5 text-primary mr-2" />
+                <Video className="w-5 h-5 mr-2 text-primary" />
                 <h3 className="font-semibold text-gray-900 dark:text-slate-100">Meeting Link</h3>
               </div>
               {interview && interview.meetingLink ? (
-                <p className="text-gray-700 dark:text-slate-300 break-all">
+                <p className="text-gray-700 break-all dark:text-slate-300">
                   {interview.meetingLink}
                 </p>
               ) : (
-                <p className="text-gray-700 dark:text-slate-300 break-all">
+                <p className="text-gray-700 break-all dark:text-slate-300">
                   https://meet.google.com/abc-defg-hij
                 </p>
               )}
             </div>
 
-            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
+            <div className="p-6 rounded-lg bg-gray-50 dark:bg-slate-700/50">
               <div className="flex items-center mb-4">
-                <Mail className="w-5 h-5 text-primary mr-2" />
+                <Mail className="w-5 h-5 mr-2 text-primary" />
                 <h3 className="font-semibold text-gray-900 dark:text-slate-100">Confirmation</h3>
               </div>
               <p className="text-gray-700 dark:text-slate-300">
                 A confirmation email has been sent to your email address
               </p>
             </div>
-
-            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-              <div className="flex items-center mb-4">
-                <Phone className="w-5 h-5 text-primary mr-2" />
-                <h3 className="font-semibold text-gray-900 dark:text-slate-100">Contact</h3>
-              </div>
-              <p className="text-gray-700 dark:text-slate-300">
-                If you need to reschedule, contact support@blocklearn.com
-              </p>
-            </div>
           </div>
 
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-8">
-            <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-2">What to Expect</h3>
-            <ul className="list-disc list-inside text-blue-800 dark:text-blue-400 space-y-1">
+          <div className="p-6 mb-8 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+            <h3 className="mb-2 font-semibold text-blue-900 dark:text-blue-300">What to Expect</h3>
+            <ul className="space-y-1 text-blue-800 list-disc list-inside dark:text-blue-400">
               <li>Introduction to BlockLearn platform and teaching methodology</li>
               <li>Demonstration of your teaching skills in one of your listed skills</li>
               <li>Discussion of your availability and preferred teaching methods</li>
@@ -173,56 +135,16 @@ export default function MentorInterviewPending() {
             </ul>
           </div>
 
-          <div className="text-center">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100 mb-4">
-              Time Until Your Interview
-            </h3>
-            <div className="flex justify-center space-x-4">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold text-gray-900 dark:text-slate-100">
-                    {timeLeft.days}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-slate-400">Days</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold text-gray-900 dark:text-slate-100">
-                    {timeLeft.hours}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-slate-400">Hours</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold text-gray-900 dark:text-slate-100">
-                    {timeLeft.minutes}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-slate-400">Minutes</span>
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-2xl font-bold text-gray-900 dark:text-slate-100">
-                    {timeLeft.seconds}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-slate-400">Seconds</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-8 flex justify-center">
+          <div className="flex justify-center mt-8">
             <button
               onClick={joinInterview}
-              className="px-6 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary/90 transition-colors mr-4"
+              className="px-6 py-3 mr-4 font-medium text-white transition-colors rounded-lg bg-primary hover:bg-primary/90"
             >
               Join Interview Session
             </button>
             <button
               onClick={() => navigate("/mentor/dashboard")}
-              className="px-6 py-3 bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-slate-200 rounded-lg font-medium hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+              className="px-6 py-3 font-medium text-gray-800 transition-colors bg-gray-200 rounded-lg dark:bg-slate-700 dark:text-slate-200 hover:bg-gray-300 dark:hover:bg-slate-600"
             >
               Go to Dashboard
             </button>
