@@ -18,7 +18,8 @@ const matchingRoutes = require('./routes/matching');
 const adminRoutes = require('./routes/admin');
 const skillsRoutes = require('./routes/skills');
 const mentorRoutes = require('./routes/mentor');
-// Interview routes removed
+const { router: signalingRoutes } = require('./routes/signaling'); // Fix the import
+const { initializeSocket } = require('./routes/signaling'); // Add Socket.IO initialization
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -81,6 +82,7 @@ app.use('/api/matching', matchingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/skills', skillsRoutes);
 app.use('/api/mentor', mentorRoutes);
+app.use('/api/signaling', signalingRoutes); // Add signaling routes
 // app.use('/api/interview', interviewRoutes); // Removed WebRTC implementation
 
 // Health check endpoint
@@ -115,10 +117,13 @@ app.use((err, req, res, next) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`Health check available at: http://localhost:${PORT}/api/health`);
 });
+
+// Initialize Socket.IO server
+initializeSocket(server);
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '../public')));

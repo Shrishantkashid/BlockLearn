@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, Calendar, Clock, Check, X } from 'lucide-react';
-import { useSocket } from '../../../React-webRTC/client/src/context/SocketProvider';
+import io from 'socket.io-client'; // Use direct socket.io-client instead
 import { createWebRTCSession, completeSession } from '../api';
 
 const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, onSessionAccepted, onJoinSession }) => {
@@ -28,7 +28,12 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
   const getInitialMessages = () => {
     try {
       const savedMessages = localStorage.getItem(`chat_messages_${chatRoomId}`);
-      return savedMessages ? JSON.parse(savedMessages) : [];
+      const messages = savedMessages ? JSON.parse(savedMessages) : [];
+      // Ensure all timestamps are Date objects and sort messages by timestamp
+      return messages.map(msg => ({
+        ...msg,
+        created_at: new Date(msg.created_at)
+      })).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     } catch (error) {
       console.error('Error loading messages from localStorage:', error);
       return [];
@@ -69,7 +74,8 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
   });
   const [pendingProposal, setPendingProposal] = useState(null);
   const messagesEndRef = useRef(null);
-  const socket = useSocket();
+  // Replace useSocket hook with direct socket reference
+  const socketRef = useRef(null);
   const [acceptedProposal, setAcceptedProposal] = useState(getInitialAcceptedProposal());
   const [sessionTimer, setSessionTimer] = useState(getInitialSessionTimer());
   const timerIntervalRef = useRef(null);
@@ -79,395 +85,153 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
   const [complaint, setComplaint] = useState('');
   const [createdSessionId, setCreatedSessionId] = useState(null);
 
-  // Check if session should be active on mount
+  // Initialize socket connection
   useEffect(() => {
-    console.log('=== COMPONENT MOUNT CHECK ===');
-    console.log('Initial accepted proposal:', acceptedProposal);
-    console.log('Initial session timer:', sessionTimer);
+    // Determine the backend URL based on environment
+    const backendUrl = import.meta.env.VITE_API_URL || 
+                      (window.location.hostname.includes('vercel.app') 
+                        ? `https://${window.location.hostname}` 
+                        : 'http://localhost:5000');
     
-    // If we have an accepted proposal but no session timer, initialize it
-    if (acceptedProposal && !sessionTimer) {
-      console.log('Found accepted proposal but no session timer, initializing...');
-      const sessionDateTime = new Date(`${acceptedProposal.date}T${acceptedProposal.time}`);
-      const now = new Date();
-      const timeUntilStart = sessionDateTime - now;
-      
-      console.log('Session date time:', sessionDateTime);
-      console.log('Current time:', now);
-      console.log('Time until start (ms):', timeUntilStart);
-      
-      let timerData;
-      
-      // If session is in the future, set up timer to start it
-      if (timeUntilStart > 0) {
-        console.log('Setting up future session timer');
-        timerData = {
-          startTime: sessionDateTime.getTime(),
-          duration: parseInt(acceptedProposal.duration) * 60, // Convert minutes to seconds
-          remaining: parseInt(acceptedProposal.duration) * 60,
-          isActive: false
-        };
-      } else if (timeUntilStart <= 0 && timeUntilStart > -acceptedProposal.duration * 60 * 1000) {
-        console.log('Setting up active session timer');
-        // Session is currently active
-        const elapsed = Math.abs(timeUntilStart) / 1000;
-        const remaining = (parseInt(acceptedProposal.duration) * 60) - elapsed;
-        
-        timerData = {
-          startTime: sessionDateTime.getTime(),
-          duration: parseInt(acceptedProposal.duration) * 60,
-          remaining: remaining > 0 ? remaining : 0,
-          isActive: true
-        };
-      } else {
-        console.log('Session is in the past');
-        // Even if session is in the past, if it was recently active, we should show the complete button
-        const timeSinceSessionEnd = Math.abs(timeUntilStart) - (acceptedProposal.duration * 60 * 1000);
-        if (timeSinceSessionEnd < 60 * 60 * 1000) { // Within last hour
-          console.log('Session was recently active, setting up active timer');
-          timerData = {
-            startTime: sessionDateTime.getTime(),
-            duration: parseInt(acceptedProposal.duration) * 60,
-            remaining: 0,
-            isActive: true
-          };
-        } else {
-          timerData = null;
-        }
-      }
-      
-      if (timerData) {
-        console.log('Setting initial session timer:', timerData);
-        setSessionTimer(timerData);
-      }
-    }
-  }, []);
+    // Connect to the signaling server with proper configuration
+    socketRef.current = io(backendUrl, {
+      transports: ['websocket'],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      timeout: 10000,
+      path: '/socket.io',
+      upgrade: false,
+      rememberUpgrade: false,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5,
+    });
 
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    try {
-      localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(messages));
-    } catch (error) {
-      console.error('Error saving messages to localStorage:', error);
-    }
-  }, [messages, chatRoomId]);
-  
-  // Save accepted proposal to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      if (acceptedProposal) {
-        localStorage.setItem(`accepted_proposal_${chatRoomId}`, JSON.stringify(acceptedProposal));
-      } else {
-        localStorage.removeItem(`accepted_proposal_${chatRoomId}`);
-      }
-    } catch (error) {
-      console.error('Error saving accepted proposal to localStorage:', error);
-    }
-  }, [acceptedProposal, chatRoomId]);
-  
-  // Save session timer to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      if (sessionTimer) {
-        localStorage.setItem(`session_timer_${chatRoomId}`, JSON.stringify(sessionTimer));
-      } else {
-        localStorage.removeItem(`session_timer_${chatRoomId}`);
-      }
-    } catch (error) {
-      console.error('Error saving session timer to localStorage:', error);
-    }
-  }, [sessionTimer, chatRoomId]);
-  
-  // Timer effect to handle session countdown
-  useEffect(() => {
-    console.log('=== SESSION TIMER INITIALIZATION EFFECT ===');
-    console.log('Accepted proposal:', acceptedProposal);
-    console.log('Session timer:', sessionTimer);
-    console.log('User type:', userType);
-    
-    if (acceptedProposal && !sessionTimer) {
-      console.log('Initializing session timer');
-      // Calculate session start time
-      const sessionDateTime = new Date(`${acceptedProposal.date}T${acceptedProposal.time}`);
-      const now = new Date();
-      const timeUntilStart = sessionDateTime - now;
-      
-      console.log('Session date time:', sessionDateTime);
-      console.log('Current time:', now);
-      console.log('Time until start (ms):', timeUntilStart);
-      console.log('Session duration (min):', acceptedProposal.duration);
-      console.log('Session duration (ms):', acceptedProposal.duration * 60 * 1000);
-      
-      // If session is in the future, set up timer to start it
-      if (timeUntilStart > 0) {
-        console.log('Setting up future session timer');
-        const timerData = {
-          startTime: sessionDateTime.getTime(),
-          duration: parseInt(acceptedProposal.duration) * 60, // Convert minutes to seconds
-          remaining: parseInt(acceptedProposal.duration) * 60,
-          isActive: false
-        };
-        
-        setSessionTimer(timerData);
-      } else if (timeUntilStart <= 0 && timeUntilStart > -acceptedProposal.duration * 60 * 1000) {
-        console.log('Setting up active session timer');
-        // Session is currently active
-        const elapsed = Math.abs(timeUntilStart) / 1000;
-        const remaining = (parseInt(acceptedProposal.duration) * 60) - elapsed;
-        
-        const timerData = {
-          startTime: sessionDateTime.getTime(),
-          duration: parseInt(acceptedProposal.duration) * 60,
-          remaining: remaining > 0 ? remaining : 0,
-          isActive: true
-        };
-        
-        setSessionTimer(timerData);
-      } else {
-        console.log('Session is in the past, not setting up timer');
-        // Even if session is in the past, if it was recently active, we should show the complete button
-        const timeSinceSessionEnd = Math.abs(timeUntilStart) - (acceptedProposal.duration * 60 * 1000);
-        if (timeSinceSessionEnd < 60 * 60 * 1000) { // Within last hour
-          console.log('Session was recently active, setting up active timer');
-          const timerData = {
-            startTime: sessionDateTime.getTime(),
-            duration: parseInt(acceptedProposal.duration) * 60,
-            remaining: 0,
-            isActive: true
-          };
-          setSessionTimer(timerData);
-        }
-      }
-    } else if (!acceptedProposal) {
-      console.log('No accepted proposal, not initializing timer');
-    } else if (sessionTimer) {
-      console.log('Session timer already exists, not reinitializing');
-    }
-    
-    // Clean up interval on unmount
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [acceptedProposal]);
-
-  // Timer interval effect
-  useEffect(() => {
-    console.log('=== SESSION TIMER INTERVAL EFFECT ===');
-    console.log('Session timer:', sessionTimer);
-    console.log('User type:', userType);
-    
-    // Clear any existing interval
-    if (timerIntervalRef.current) {
-      console.log('Clearing existing timer interval');
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    
-    // Set up new interval if we have a session timer
-    if (sessionTimer) {
-      console.log('Setting up new timer interval');
-      timerIntervalRef.current = setInterval(() => {
-        setSessionTimer(prevTimer => {
-          if (!prevTimer) return null;
-          
-          const now = Date.now();
-          const sessionStartTime = prevTimer.startTime;
-          const timeUntilStart = sessionStartTime - now;
-          
-          console.log('Timer update - timeUntilStart:', timeUntilStart);
-          console.log('Timer update - isActive:', prevTimer.isActive);
-          
-          // Session hasn't started yet
-          if (timeUntilStart > 0) {
-            // Update countdown to start time
-            const secondsUntilStart = Math.floor(timeUntilStart / 1000);
-            console.log('Session not started yet, seconds until start:', secondsUntilStart);
-            return {
-              ...prevTimer,
-              remaining: secondsUntilStart > 0 ? secondsUntilStart : 0
-            };
-          }
-          
-          // Session should be active now
-          if (!prevTimer.isActive && timeUntilStart <= 0) {
-            console.log('Session is now active, sending email notifications');
-            console.log('Time until start:', timeUntilStart);
-            console.log('Session duration:', prevTimer.duration);
-            // Send email notifications when session starts
-            sendSessionStartEmails();
-            
-            return {
-              ...prevTimer,
-              isActive: true,
-              remaining: prevTimer.duration
-            };
-          }
-          
-          // Session is active, update remaining time
-          if (prevTimer.isActive) {
-            const newRemaining = prevTimer.remaining - 1;
-            console.log('Session is active, remaining time:', newRemaining);
-            
-            // Session ended
-            if (newRemaining <= 0) {
-              console.log('Session timer ended, clearing interval');
-              if (timerIntervalRef.current) {
-                clearInterval(timerIntervalRef.current);
-                timerIntervalRef.current = null;
-              }
-              return null;
-            }
-            
-            return {
-              ...prevTimer,
-              remaining: newRemaining
-            };
-          }
-          
-          return prevTimer;
-        });
-      }, 1000);
-    } else {
-      console.log('No session timer, not setting up interval');
-    }
-    
-    // Clean up interval on unmount
-    return () => {
-      if (timerIntervalRef.current) {
-        console.log('Cleaning up timer interval on unmount');
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [sessionTimer]);
-  
-  // Function to send email notifications when session starts
-  const sendSessionStartEmails = async () => {
-    try {
-      // In a real implementation, you would call your backend API to send emails
-      console.log('Sending session start emails to mentor and learner');
-      
-      // Add system message to chat
-      const emailMessage = {
-        id: Date.now() + Math.random(),
-        sender_id: 'system',
-        sender: { first_name: 'System', last_name: '' },
-        message: 'Session has started! Email notifications sent to both participants.',
-        created_at: new Date(),
-        message_type: 'system'
-      };
-      
-      setMessages(prev => [...prev, emailMessage]);
-    } catch (error) {
-      console.error('Error sending session start emails:', error);
-    }
-  };
-  
-  // Format time for display (HH:MM:SS)
-  const formatTime = (seconds) => {
-    const hrs = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Scroll to bottom of messages
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  // Join the chat room when component mounts
-  useEffect(() => {
-    if (socket) {
-      console.log('=== SOCKET CONNECTION INFO ===');
-      console.log('Socket connection status:', socket.connected);
-      console.log('User email:', user.email);
-      console.log('Other user email:', otherUser.email);
-      console.log('Current user ID:', user.id);
-      console.log('Other user ID:', otherUser.id);
-      console.log('User IDs:', getUserIds());
-      console.log('Session ID:', getConsistentSessionId());
-      console.log('Attempting to join room:', chatRoomId);
+    // Handle connection
+    socketRef.current.on('connect', () => {
+      console.log('Connected to Socket.IO server with ID:', socketRef.current.id);
+      console.log('Joining room with ID:', chatRoomId);
       
       // Join the chat room
-      socket.emit("room:join", {
+      socketRef.current.emit("room:join", {
         email: user.email,
         room: chatRoomId
       });
+    });
 
-      // Listen for incoming messages
-      socket.on("chat:message", (data) => {
-        console.log('Received message:', data);
-        const { email, message, timestamp } = data;
-        const sender = email === user.email ? user : otherUser;
-        
-        setMessages(prev => [...prev, {
+    // Handle connection error
+    socketRef.current.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+    });
+
+    // Handle disconnect
+    socketRef.current.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+    });
+
+    // Listen for incoming messages
+    socketRef.current.on("chat:message", (data) => {
+      console.log('Received message:', data);
+      const { email, message, timestamp } = data;
+      const sender = email === user.email ? user : otherUser;
+      
+      setMessages(prev => {
+        const newMessages = [...prev, {
           id: Date.now() + Math.random(),
           sender_id: sender.id,
           sender: sender,
           message: message,
           created_at: new Date(timestamp),
           message_type: 'text'
-        }]);
-      });
-
-      // Listen for session proposals
-      socket.on("session:propose", (data) => {
-        console.log('=== SESSION PROPOSAL EVENT RECEIVED ===');
-        console.log('Raw data:', data);
-        console.log('Stringified data:', JSON.stringify(data, null, 2));
-        console.log('Current user email:', user.email);
-        console.log('Current room ID:', chatRoomId);
-        
-        // Check if we have the required data
-        if (!data || !data.proposer || !data.proposal) {
-          console.error('Invalid proposal data received:', data);
-          return;
+        }];
+        // Sort messages by timestamp
+        const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        // Save to localStorage
+        try {
+          localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+        } catch (error) {
+          console.error('Error saving messages to localStorage:', error);
         }
-        
-        const { proposer, proposal } = data;
-        console.log('Proposer email:', proposer.email);
-        console.log('Proposal details:', proposal);
-        
-        // Make sure this isn't our own proposal coming back
-        if (proposer.email === user.email) {
-          console.log('Ignoring own proposal');
-          return;
-        }
-        
-        // Set the pending proposal to trigger the popup
-        setPendingProposal({ proposer, proposal });
-        
-        console.log('Pending proposal set:', { proposer, proposal });
+        return sortedMessages;
       });
+    });
 
-      // Listen for session proposal responses
-      socket.on("session:response", (data) => {
-        console.log('=== RECEIVED SESSION RESPONSE ===');
-        console.log('Data received:', data);
-        console.log('Current room ID:', chatRoomId);
-        console.log('Current user:', user);
-        console.log('Other user:', otherUser);
+    // Listen for session proposals
+    socketRef.current.on("session:propose", (data) => {
+      console.log('=== SESSION PROPOSAL EVENT RECEIVED ===');
+      console.log('Raw data:', data);
+      console.log('Stringified data:', JSON.stringify(data, null, 2));
+      console.log('Current user email:', user.email);
+      console.log('Current room ID:', chatRoomId);
+      
+      // Check if this proposal is for us (not from ourselves)
+      // More robust check that handles various email property formats
+      const proposerEmail = data.proposer?.email || data.proposer?.user_email;
+      if (data.proposer && proposerEmail && proposerEmail !== user.email) {
+        console.log('Session proposal is for us, showing notification');
+        // Show notification about the proposal
+        setMessages(prev => {
+          const newMessages = [...prev, {
+            id: Date.now() + Math.random(),
+            sender_id: 'system',
+            sender: { first_name: 'System', last_name: '' },
+            message: `${data.proposer.first_name} ${data.proposer.last_name} proposed a session`,
+            created_at: new Date(),
+            message_type: 'system'
+          }];
+          // Sort messages by timestamp
+          const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          // Save to localStorage
+          try {
+            localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+          } catch (error) {
+            console.error('Error saving messages to localStorage:', error);
+          }
+          return sortedMessages;
+        });
         
-        const { responder, response, proposal } = data;
-        
-        // Add response to messages
-        const responseMessage = {
-          id: Date.now() + Math.random(),
-          sender_id: responder.id,
-          sender: responder,
-          message: `Session ${response}`,
-          created_at: new Date(),
-          message_type: 'system'
-        };
-        
-        setMessages(prev => [...prev, responseMessage]);
+        // Store the pending proposal
+        setPendingProposal(data);
+      } else {
+        console.log('Session proposal is from ourselves or invalid, ignoring');
+        console.log('data.proposer:', data.proposer);
+        console.log('proposerEmail:', proposerEmail);
+        console.log('user.email:', user.email);
+      }
+    });
+
+    // Listen for session responses
+    socketRef.current.on("session:response", (data) => {
+      console.log('=== SESSION RESPONSE EVENT RECEIVED ===');
+      console.log('Raw data:', data);
+      
+      const { responder, response, proposal } = data;
+      
+      // Check if this response is for us (not from ourselves)
+      // More robust check that handles various email property formats
+      const responderEmail = responder?.email || responder?.user_email;
+      if (responder && responderEmail && responderEmail !== user.email) {
+        // Add response to local messages
+        setMessages(prev => {
+          const newMessages = [...prev, {
+            id: Date.now() + Math.random(),
+            sender_id: responder.id,
+            sender: responder,
+            message: `Session ${response}`,
+            created_at: new Date(),
+            message_type: 'system'
+          }];
+          // Sort messages by timestamp
+          const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          // Save to localStorage
+          try {
+            localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+          } catch (error) {
+            console.error('Error saving messages to localStorage:', error);
+          }
+          return sortedMessages;
+        });
         
         // If accepted, notify parent component and set state for join button
         if (response === 'accepted') {
@@ -475,178 +239,208 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
             meetingLink: 'https://meet.jit.si/blocklearn-session-room',
             jitsiRoomName: 'blocklearn-session-room'
           });
-          // Set state to show join button for both mentor and learner
-          const proposalData = pendingProposal ? pendingProposal.proposal : proposal;
-          setAcceptedProposal(proposalData);
+          // Set state to show join button
+          setAcceptedProposal(proposal);
           
-          // Initialize session timer
-          const sessionDateTime = new Date(`${proposalData.date}T${proposalData.time}`);
-          console.log('Initializing session timer for accepted proposal:', proposalData);
-          console.log('Session date time:', sessionDateTime);
-          
-          const timerData = {
-            startTime: sessionDateTime.getTime(),
-            duration: parseInt(proposalData.duration) * 60, // Convert minutes to seconds
-            remaining: parseInt(proposalData.duration) * 60,
-            isActive: false
-          };
-          
-          console.log('Setting session timer data:', timerData);
-          setSessionTimer(timerData);
+          // Create session in database when proposal is accepted
+          handleCreateSession(proposal);
         }
-        
-        setPendingProposal(null);
-      });
-      
-      // Listen for session end notifications
-      socket.on("session:end", (data) => {
-        console.log('=== SESSION END NOTIFICATION RECEIVED ===');
-        console.log('Data received:', data);
-        
-        // Clear the session timer
-        setSessionTimer(null);
-        
-        // Add system message to chat
-        const endMessage = {
-          id: Date.now() + Math.random(),
-          sender_id: 'system',
-          sender: { first_name: 'System', last_name: '' },
-          message: `Session has been ended by ${data.endedBy.first_name} ${data.endedBy.last_name}.`,
-          created_at: new Date(),
-          message_type: 'system'
-        };
-        
-        setMessages(prev => [...prev, endMessage]);
-        
-        // Clear accepted proposal
-        setAcceptedProposal(null);
-      });
-      
-      // Listen for session created notifications
-      socket.on("session:created", (data) => {
-        console.log('=== SESSION CREATED NOTIFICATION RECEIVED ===');
-        console.log('Data received:', data);
-        
-        // Add system message to chat
-        const createdMessage = {
-          id: Date.now() + Math.random(),
-          sender_id: 'system',
-          sender: { first_name: 'System', last_name: '' },
-          message: `Session has been scheduled for ${new Date(data.sessionData.scheduled_at).toLocaleString()}`,
-          created_at: new Date(),
-          message_type: 'system'
-        };
-        
-        setMessages(prev => [...prev, createdMessage]);
-        
-        // Emit event to refresh sessions in dashboard
-        window.dispatchEvent(new CustomEvent('session-created', { detail: data }));
-      });
-      
-      // Listen for session complete notifications
-      socket.on("session:complete", (data) => {
-        console.log('=== SESSION COMPLETE NOTIFICATION RECEIVED ===');
-        console.log('Data received:', data);
-        console.log('Current user type:', userType);
-        console.log('Current user:', user);
-        console.log('Session timer before clearing:', sessionTimer);
-        
-        // Clear the session timer
-        setSessionTimer(null);
-        
-        // Add system message to chat
-        const completeMessage = {
-          id: Date.now() + Math.random(),
-          sender_id: 'system',
-          sender: { first_name: 'System', last_name: '' },
-          message: `Session has been marked as completed by ${data.completedBy.first_name} ${data.completedBy.last_name}.`,
-          created_at: new Date(),
-          message_type: 'system'
-        };
-        
-        setMessages(prev => [...prev, completeMessage]);
-        
-        // Clear accepted proposal
-        setAcceptedProposal(null);
-        
-        // Show rating modal only to learner
-        console.log('Checking if user is learner to show rating modal');
-        console.log('User type is learner:', userType === 'learner');
-        if (userType === 'learner') {
-          console.log('Showing rating modal to learner');
-          setShowRatingModal(true);
-        } else {
-          console.log('User is not learner, not showing rating modal. User type:', userType);
-        }
-      });
+      }
+    });
 
-      // Listen for user joined events
-      socket.on("user:joined", (data) => {
-        console.log('=== USER JOINED EVENT ===');
-        console.log('User joined data:', data);
-        console.log('Current user email:', user.email);
-        
-        const { email } = data;
-        if (email !== user.email) {
-          console.log('Adding system message for user join');
-          // Add a system message that the other user joined
-          setMessages(prev => [...prev, {
+    // Listen for session completion
+    socketRef.current.on("session:complete", (data) => {
+      console.log('=== SESSION COMPLETE EVENT RECEIVED ===');
+      console.log('Raw data:', data);
+      
+      const { completedBy } = data;
+      
+      // Add completion message to local messages
+      setMessages(prev => {
+        const newMessages = [...prev, {
+          id: Date.now() + Math.random(),
+          sender_id: 'system',
+          sender: { first_name: 'System', last_name: '' },
+          message: `Session completed by ${completedBy.email === user.email ? 'You' : completedBy.email}`,
+          created_at: new Date(),
+          message_type: 'system'
+        }];
+        // Sort messages by timestamp
+        const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        // Save to localStorage
+        try {
+          localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+        } catch (error) {
+          console.error('Error saving messages to localStorage:', error);
+        }
+        return sortedMessages;
+      });
+      
+      // Clear accepted proposal and session timer
+      setAcceptedProposal(null);
+      setSessionTimer(null);
+      localStorage.removeItem(`accepted_proposal_${chatRoomId}`);
+      localStorage.removeItem(`session_timer_${chatRoomId}`);
+      
+      // Show rating modal
+      setShowRatingModal(true);
+    });
+
+    // Listen for session end
+    socketRef.current.on("session:end", (data) => {
+      console.log('=== SESSION END EVENT RECEIVED ===');
+      console.log('Raw data:', data);
+      
+      const { endedBy } = data;
+      
+      // Add end message to local messages
+      setMessages(prev => {
+        const newMessages = [...prev, {
+          id: Date.now() + Math.random(),
+          sender_id: 'system',
+          sender: { first_name: 'System', last_name: '' },
+          message: `Session ended by ${endedBy.email === user.email ? 'You' : endedBy.email}`,
+          created_at: new Date(),
+          message_type: 'system'
+        }];
+        // Sort messages by timestamp
+        const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        // Save to localStorage
+        try {
+          localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+        } catch (error) {
+          console.error('Error saving messages to localStorage:', error);
+        }
+        return sortedMessages;
+      });
+      
+      // Clear accepted proposal and session timer
+      setAcceptedProposal(null);
+      setSessionTimer(null);
+      localStorage.removeItem(`accepted_proposal_${chatRoomId}`);
+      localStorage.removeItem(`session_timer_${chatRoomId}`);
+    });
+
+    // Listen for session creation
+    socketRef.current.on("session:created", (data) => {
+      console.log('=== SESSION CREATED EVENT RECEIVED ===');
+      console.log('Raw data:', data);
+      
+      const { sessionData, createdBy } = data;
+      
+      // Add creation message to local messages
+      setMessages(prev => {
+        const newMessages = [...prev, {
+          id: Date.now() + Math.random(),
+          sender_id: 'system',
+          sender: { first_name: 'System', last_name: '' },
+          message: `Session created by ${createdBy.email === user.email ? 'You' : createdBy.email}`,
+          created_at: new Date(),
+          message_type: 'system'
+        }];
+        // Sort messages by timestamp
+        const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        // Save to localStorage
+        try {
+          localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+        } catch (error) {
+          console.error('Error saving messages to localStorage:', error);
+        }
+        return sortedMessages;
+      });
+      
+      // Dispatch a custom event to notify other components
+      window.dispatchEvent(new CustomEvent('session-created', { detail: sessionData }));
+    });
+
+    // Listen for user joined events
+    socketRef.current.on("user:joined", (data) => {
+      console.log('=== USER JOINED EVENT RECEIVED ===');
+      console.log('Raw data:', data);
+      console.log('Current user email:', user.email);
+      
+      const { email } = data;
+      if (email !== user.email) {
+        console.log('Adding system message for user join');
+        // Add a system message that the other user joined
+        setMessages(prev => {
+          const newMessages = [...prev, {
             id: Date.now() + Math.random(),
             sender_id: 'system',
             sender: { first_name: 'System', last_name: '' },
             message: `${otherUser.first_name} ${otherUser.last_name} joined the chat`,
-            created_at: new Date(),
+            created_at: new Date(), // Ensure proper timestamp
             message_type: 'system'
-          }]);
+          }];
+          // Sort messages by timestamp
+          const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+          // Save to localStorage
+          try {
+            localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+          } catch (error) {
+            console.error('Error saving messages to localStorage:', error);
+          }
+          return sortedMessages;
+        });
+        
+        // If both users have joined and we have an accepted proposal, start the timer
+        if (acceptedProposal) {
+          startSessionTimer();
         }
-      });
-      
-      // Listen for room join confirmation
-      socket.on("room:join", (data) => {
-        console.log('=== ROOM JOIN CONFIRMATION ===');
-        console.log('Room join confirmed:', data);
-      });
-    }
+      }
+    });
 
-    // Clean up event listeners
+    // Listen for room join confirmation
+    socketRef.current.on("room:join", (data) => {
+      console.log('=== ROOM JOIN CONFIRMATION ===');
+      console.log('Room join confirmed:', data);
+    });
+
+    // Clean up socket connection
     return () => {
-      if (socket) {
-        socket.off("chat:message");
-        socket.off("session:propose");
-        socket.off("session:response");
-        socket.off("session:complete");
-        socket.off("session:end");
-        socket.off("session:created");
-        socket.off("user:joined");
-        socket.off("room:join");
+      if (socketRef.current) {
+        socketRef.current.disconnect();
       }
     };
-  }, [socket, chatRoomId, user, otherUser]);
+  }, [chatRoomId, user, otherUser]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !socket) return;
+    if (!newMessage.trim() || !socketRef.current) return;
 
     console.log('Sending message:', newMessage);
     console.log('Room ID:', chatRoomId);
     
+    const timestamp = new Date().toISOString();
+    
+    // Add message to local state immediately
+    setMessages(prev => {
+      const newMessages = [...prev, {
+        id: Date.now() + Math.random(),
+        sender_id: user.id,
+        sender: user,
+        message: newMessage,
+        created_at: new Date(timestamp),
+        message_type: 'text'
+      }];
+      // Sort messages by timestamp
+      const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      // Save to localStorage
+      try {
+        localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+      } catch (error) {
+        console.error('Error saving messages to localStorage:', error);
+      }
+      return sortedMessages;
+    });
+
     // Send message through WebRTC signaling
-    socket.emit("chat:message", {
+    socketRef.current.emit("chat:message", {
       room: chatRoomId,
       email: user.email,
       message: newMessage,
-      timestamp: new Date().toISOString()
+      timestamp: timestamp
     });
-
-    // Add message to local state immediately
-    setMessages(prev => [...prev, {
-      id: Date.now() + Math.random(),
-      sender_id: user.id,
-      sender: user,
-      message: newMessage,
-      created_at: new Date(),
-      message_type: 'text'
-    }]);
 
     setNewMessage('');
   };
@@ -684,20 +478,29 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
     console.log('Proposal data:', proposalData);
     
     // Send proposal through WebRTC signaling
-    socket.emit("session:propose", proposalData);
+    socketRef.current.emit("session:propose", proposalData);
 
     // Add proposal to local messages
-    const proposalMessage = {
-      id: Date.now() + Math.random(),
-      sender_id: user.id,
-      sender: user,
-      message: `Proposed session: ${sessionProposal.topic} on ${sessionProposal.date} at ${sessionProposal.time} for ${sessionProposal.duration} minutes`,
-      created_at: new Date(),
-      message_type: 'proposal',
-      metadata: { proposal: sessionProposal }
-    };
-    
-    setMessages(prev => [...prev, proposalMessage]);
+    setMessages(prev => {
+      const newMessages = [...prev, {
+        id: Date.now() + Math.random(),
+        sender_id: user.id,
+        sender: user,
+        message: `Proposed session: ${sessionProposal.topic} on ${sessionProposal.date} at ${sessionProposal.time} for ${sessionProposal.duration} minutes`,
+        created_at: new Date(),
+        message_type: 'proposal',
+        metadata: { proposal: sessionProposal }
+      }];
+      // Sort messages by timestamp
+      const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      // Save to localStorage
+      try {
+        localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+      } catch (error) {
+        console.error('Error saving messages to localStorage:', error);
+      }
+      return sortedMessages;
+    });
     
     // Notify parent component
     onSessionInitiated && onSessionInitiated(sessionProposal);
@@ -720,7 +523,7 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
     console.log('Proposal:', pendingProposal);
     
     // Send response through WebRTC signaling
-    socket.emit("session:response", {
+    socketRef.current.emit("session:response", {
       room: chatRoomId,
       responder: {
         email: user.email,
@@ -733,16 +536,25 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
     });
 
     // Add response to local messages
-    const responseMessage = {
-      id: Date.now() + Math.random(),
-      sender_id: user.id,
-      sender: user,
-      message: `Session ${response}`,
-      created_at: new Date(),
-      message_type: 'system'
-    };
-    
-    setMessages(prev => [...prev, responseMessage]);
+    setMessages(prev => {
+      const newMessages = [...prev, {
+        id: Date.now() + Math.random(),
+        sender_id: user.id,
+        sender: user,
+        message: `Session ${response}`,
+        created_at: new Date(),
+        message_type: 'system'
+      }];
+      // Sort messages by timestamp
+      const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      // Save to localStorage
+      try {
+        localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+      } catch (error) {
+        console.error('Error saving messages to localStorage:', error);
+      }
+      return sortedMessages;
+    });
     
     // If accepted, notify parent component and set state for join button
     if (response === 'accepted') {
@@ -754,14 +566,14 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
       setAcceptedProposal(pendingProposal.proposal);
       
       // Create session in database when proposal is accepted
-      createSessionInDatabase(pendingProposal.proposal);
+      handleCreateSession(pendingProposal.proposal);
     }
     
     setPendingProposal(null);
   };
 
   // Function to create session in database
-  const createSessionInDatabase = async (proposal) => {
+  const handleCreateSession = async (proposal) => {
     try {
       // Determine mentor and student IDs
       // If current user is mentor, then otherUser is student, and vice versa
@@ -794,7 +606,7 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
         setCreatedSessionId(result.data.id);
         
         // Emit socket event to notify other user
-        socket.emit("session:created", { 
+        socketRef.current.emit("session:created", { 
           sessionData: result.data, 
           createdBy: user
         });
@@ -811,33 +623,155 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatTime = (seconds) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hrs > 0) {
+      return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleJoinSession = () => {
     if (acceptedProposal && onJoinSession) {
       // Different URLs for mentor and learner
+      let meetingLink;
+      let jitsiRoomName;
+      
       if (userType === 'mentor') {
         // Mentor redirects to moderated Jitsi room
-        window.location.href = 'https://moderated.jitsi.net/0057029a7d5e40fdbae508b18d54bf4f62211d016bd64f9ca248d87870717703';
+        meetingLink = 'https://moderated.jitsi.net/0057029a7d5e40fdbae508b18d54bf4f62211d016bd64f9ca248d87870717703';
+        jitsiRoomName = '0057029a7d5e40fdbae508b18d54bf4f62211d016bd64f9ca248d87870717703';
+        window.location.href = meetingLink;
       } else {
         // Learner joins regular Jitsi room
-        window.open('https://meet.jit.si/moderated/b8692948b1e6f09ab6451591d304e8794c73fdaa72a0911c75591a461daa476b', '_blank');
+        meetingLink = 'https://meet.jitsi.net/moderated/b8692948b1e6f09ab6451591d304e8794c73fdaa72a0911c75591a461daa476b';
+        jitsiRoomName = 'b8692948b1e6f09ab6451591d304e8794c73fdaa72a0911c75591a461daa476b';
+        window.open(meetingLink, '_blank');
       }
       
-      // Also notify parent component
+      // Start the session timer when the user joins
+      startSessionTimer();
+      
+      // Notify parent component
       onJoinSession({
-        meetingLink: userType === 'mentor' 
-          ? 'https://moderated.jitsi.net/0057029a7d5e40fdbae508b18d54bf4f62211d016bd64f9ca248d87870717703'
-          : 'https://meet.jit.si/moderated/b8692948b1e6f09ab6451591d304e8794c73fdaa72a0911c75591a461daa476b',
-        jitsiRoomName: userType === 'mentor' 
-          ? '0057029a7d5e40fdbae508b18d54bf4f62211d016bd64f9ca248d87870717703'
-          : 'b8692948b1e6f09ab6451591d304e8794c73fdaa72a0911c75591a461daa476b'
+        meetingLink,
+        jitsiRoomName
       });
     }
   };
 
+  // Function to start the session timer
+  const startSessionTimer = () => {
+    // Set initial timer state
+    const initialTimerState = {
+      isActive: true,
+      startTime: Date.now(),
+      remaining: 3600, // 60 minutes in seconds
+    };
+    
+    setSessionTimer(initialTimerState);
+    
+    // Save to localStorage
+    try {
+      localStorage.setItem(`session_timer_${chatRoomId}`, JSON.stringify(initialTimerState));
+    } catch (error) {
+      console.error('Error saving session timer to localStorage:', error);
+    }
+    
+    // Start the timer interval
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+    }
+    
+    timerIntervalRef.current = setInterval(() => {
+      setSessionTimer(prevTimer => {
+        if (!prevTimer || !prevTimer.isActive) {
+          return prevTimer;
+        }
+        
+        const elapsed = Math.floor((Date.now() - prevTimer.startTime) / 1000);
+        const remaining = Math.max(0, prevTimer.remaining - elapsed);
+        
+        const updatedTimer = {
+          ...prevTimer,
+          remaining
+        };
+        
+        // Save to localStorage
+        try {
+          localStorage.setItem(`session_timer_${chatRoomId}`, JSON.stringify(updatedTimer));
+        } catch (error) {
+          console.error('Error saving session timer to localStorage:', error);
+        }
+        
+        // If timer reaches zero, end the session
+        if (remaining <= 0) {
+          handleEndSession();
+        }
+        
+        return updatedTimer;
+      });
+    }, 1000); // Update every second
+  };
+
+  // Initialize timer if it exists in localStorage when component mounts
+  useEffect(() => {
+    // Check if there's an active session timer in localStorage
+    const savedTimer = getInitialSessionTimer();
+    if (savedTimer && savedTimer.isActive) {
+      setSessionTimer(savedTimer);
+      
+      // Resume the timer
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      
+      timerIntervalRef.current = setInterval(() => {
+        setSessionTimer(prevTimer => {
+          if (!prevTimer || !prevTimer.isActive) {
+            return prevTimer;
+          }
+          
+          const elapsed = Math.floor((Date.now() - prevTimer.startTime) / 1000);
+          const remaining = Math.max(0, prevTimer.remaining - elapsed);
+          
+          const updatedTimer = {
+            ...prevTimer,
+            remaining
+          };
+          
+          // Save to localStorage
+          try {
+            localStorage.setItem(`session_timer_${chatRoomId}`, JSON.stringify(updatedTimer));
+          } catch (error) {
+            console.error('Error saving session timer to localStorage:', error);
+          }
+          
+          // If timer reaches zero, end the session
+          if (remaining <= 0) {
+            handleEndSession();
+          }
+          
+          return updatedTimer;
+        });
+      }, 1000); // Update every second
+    }
+    
+    // Clean up interval on unmount
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [chatRoomId]);
+
   const handleEndSession = () => {
     // Send end session notification to other user
-    if (socket) {
-      socket.emit("session:end", {
+    if (socketRef.current) {
+      socketRef.current.emit("session:end", {
         room: chatRoomId,
         endedBy: {
           email: user.email,
@@ -852,16 +786,25 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
     setSessionTimer(null);
     
     // Add system message to chat
-    const endMessage = {
-      id: Date.now() + Math.random(),
-      sender_id: 'system',
-      sender: { first_name: 'System', last_name: '' },
-      message: 'Session has been ended by the mentor.',
-      created_at: new Date(),
-      message_type: 'system'
-    };
-    
-    setMessages(prev => [...prev, endMessage]);
+    setMessages(prev => {
+      const newMessages = [...prev, {
+        id: Date.now() + Math.random(),
+        sender_id: 'system',
+        sender: { first_name: 'System', last_name: '' },
+        message: 'Session has been ended by the mentor.',
+        created_at: new Date(),
+        message_type: 'system'
+      }];
+      // Sort messages by timestamp
+      const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      // Save to localStorage
+      try {
+        localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+      } catch (error) {
+        console.error('Error saving messages to localStorage:', error);
+      }
+      return sortedMessages;
+    });
     
     // Clear accepted proposal
     setAcceptedProposal(null);
@@ -870,15 +813,15 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
   const handleCompleteSession = async () => {
     console.log('=== HANDLE COMPLETE SESSION CALLED ===');
     console.log('User type:', userType);
-    console.log('Socket available:', !!socket);
+    console.log('Socket available:', !!socketRef.current);
     console.log('Chat room ID:', chatRoomId);
     console.log('Session timer:', sessionTimer);
     console.log('Session timer is active:', sessionTimer?.isActive);
     
     // Send complete session notification to other user
-    if (socket) {
+    if (socketRef.current) {
       console.log('Sending session:complete event to room:', chatRoomId);
-      socket.emit("session:complete", {
+      socketRef.current.emit("session:complete", {
         room: chatRoomId,
         completedBy: {
           email: user.email,
@@ -893,16 +836,25 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
     setSessionTimer(null);
     
     // Add system message to chat
-    const completeMessage = {
-      id: Date.now() + Math.random(),
-      sender_id: 'system',
-      sender: { first_name: 'System', last_name: '' },
-      message: 'Session has been marked as completed.',
-      created_at: new Date(),
-      message_type: 'system'
-    };
-    
-    setMessages(prev => [...prev, completeMessage]);
+    setMessages(prev => {
+      const newMessages = [...prev, {
+        id: Date.now() + Math.random(),
+        sender_id: 'system',
+        sender: { first_name: 'System', last_name: '' },
+        message: 'Session has been marked as completed.',
+        created_at: new Date(),
+        message_type: 'system'
+      }];
+      // Sort messages by timestamp
+      const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      // Save to localStorage
+      try {
+        localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+      } catch (error) {
+        console.error('Error saving messages to localStorage:', error);
+      }
+      return sortedMessages;
+    });
     
     // Clear accepted proposal
     setAcceptedProposal(null);
@@ -927,16 +879,25 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
       }
       
       // Add system message to chat
-      const ratingMessage = {
-        id: Date.now() + Math.random(),
-        sender_id: 'system',
-        sender: { first_name: 'System', last_name: '' },
-        message: `Thank you for your feedback! You rated this session ${rating} stars.`,
-        created_at: new Date(),
-        message_type: 'system'
-      };
-      
-      setMessages(prev => [...prev, ratingMessage]);
+      setMessages(prev => {
+        const newMessages = [...prev, {
+          id: Date.now() + Math.random(),
+          sender_id: 'system',
+          sender: { first_name: 'System', last_name: '' },
+          message: `Thank you for your feedback! You rated this session ${rating} stars.`,
+          created_at: new Date(),
+          message_type: 'system'
+        }];
+        // Sort messages by timestamp
+        const sortedMessages = newMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        // Save to localStorage
+        try {
+          localStorage.setItem(`chat_messages_${chatRoomId}`, JSON.stringify(sortedMessages));
+        } catch (error) {
+          console.error('Error saving messages to localStorage:', error);
+        }
+        return sortedMessages;
+      });
       
       // Close modal
       setShowRatingModal(false);
@@ -949,6 +910,22 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
       console.error('Error submitting rating:', error);
     }
   };
+
+  // Scroll to bottom of chat when messages change or component mounts
+  useEffect(() => {
+    // Scroll to bottom on initial load and when messages change
+    const scrollToBottom = () => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+      }
+    };
+    
+    // Scroll immediately and then after a small delay to ensure DOM updates
+    scrollToBottom();
+    const timer = setTimeout(scrollToBottom, 100);
+    
+    return () => clearTimeout(timer);
+  }, [messages]);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
@@ -1023,7 +1000,7 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Chat Messages - Scrollable area when no form is shown */}
         {!showSessionForm && (
-          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-slate-900/50">
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 dark:bg-slate-900/50" style={{ display: 'flex', flexDirection: 'column' }}>
             {loading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -1070,7 +1047,7 @@ const WebRTCChat = ({ user, otherUser, userType, sessionId, onSessionInitiated, 
                     </div>
                   );
                 })}
-                <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} style={{ marginTop: 'auto' }} />
               </>
             )}
           </div>

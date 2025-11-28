@@ -261,6 +261,20 @@ const initializeSocket = (server) => {
       }
     });
 
+    // Handle chat messages for WebRTC chat
+    socket.on('chat:message', (data) => {
+      console.log('Received chat message from:', socket.id, 'in room:', data.room, 'message:', data.message);
+      // Broadcast message to all users in the room except sender
+      if (data.room) {
+        socket.to(data.room).emit('chat:message', {
+          room: data.room,
+          email: data.email,
+          message: data.message,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
     // Handle proposed times for session scheduling
     socket.on('propose-time', (data) => {
       console.log('Received proposed time from:', socket.id, 'in room:', data.roomId, 'dateTime:', data.dateTime);
@@ -300,6 +314,80 @@ const initializeSocket = (server) => {
           response: data.response, // 'accepted' or 'rejected'
           responderType: data.responderType, // 'mentor' or 'learner'
           dateTime: data.dateTime,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle session proposals
+    socket.on('session:propose', (data) => {
+      console.log('Received session proposal from:', socket.id, 'in room:', data.room);
+      console.log('Proposal data:', data);
+      // Broadcast session proposal to all users in the room except sender
+      if (data.room) {
+        socket.to(data.room).emit('session:propose', {
+          room: data.room,
+          proposer: data.proposer,
+          proposal: data.proposal,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle session responses
+    socket.on('session:response', (data) => {
+      console.log('Received session response from:', socket.id, 'in room:', data.room);
+      console.log('Response data:', data);
+      // Broadcast session response to all users in the room except sender
+      if (data.room) {
+        socket.to(data.room).emit('session:response', {
+          room: data.room,
+          responder: data.responder,
+          response: data.response,
+          proposal: data.proposal,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle session creation
+    socket.on('session:created', (data) => {
+      console.log('Received session created event from:', socket.id, 'in room:', data.room);
+      console.log('Session data:', data);
+      // Broadcast session creation to all users in the room except sender
+      if (data.room) {
+        socket.to(data.room).emit('session:created', {
+          room: data.room,
+          sessionData: data.sessionData,
+          createdBy: data.createdBy,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle session end
+    socket.on('session:end', (data) => {
+      console.log('Received session end event from:', socket.id, 'in room:', data.room);
+      console.log('End data:', data);
+      // Broadcast session end to all users in the room except sender
+      if (data.room) {
+        socket.to(data.room).emit('session:end', {
+          room: data.room,
+          endedBy: data.endedBy,
+          timestamp: data.timestamp || new Date().toISOString()
+        });
+      }
+    });
+
+    // Handle session completion
+    socket.on('session:complete', (data) => {
+      console.log('Received session complete event from:', socket.id, 'in room:', data.room);
+      console.log('Complete data:', data);
+      // Broadcast session completion to all users in the room except sender
+      if (data.room) {
+        socket.to(data.room).emit('session:complete', {
+          room: data.room,
+          completedBy: data.completedBy,
           timestamp: data.timestamp || new Date().toISOString()
         });
       }
