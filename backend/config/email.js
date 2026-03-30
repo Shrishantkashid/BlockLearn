@@ -7,9 +7,12 @@ const createTransporter = () => {
     EMAIL_HOST,
     EMAIL_PORT,
     EMAIL_SECURE,
-    EMAIL_USER,
-    EMAIL_PASS // Changed from EMAIL_PASSWORD to EMAIL_PASS
+    EMAIL_USER: rawEmailUser,
+    EMAIL_PASS: rawEmailPass // Changed from EMAIL_PASSWORD to EMAIL_PASS
   } = process.env;
+
+  const EMAIL_USER = rawEmailUser ? rawEmailUser.trim() : '';
+  const EMAIL_PASS = rawEmailPass ? rawEmailPass.trim() : '';
 
   // Use Gmail service by default if user has Gmail account
   const useGmailService = EMAIL_SERVICE === 'gmail' || (!EMAIL_SERVICE && EMAIL_USER && EMAIL_USER.includes('@gmail.com'));
@@ -52,6 +55,10 @@ const sendOTP = async (to, otp) => {
     console.log('OTP email sent:', info.messageId);
     return true;
   } catch (error) {
+    if (error.responseCode === 535) {
+      console.error('❌ Gmail Authentication Failed (535): Invalid credentials or App Password rejected.');
+      console.error('💡 TIP: Regenerate a 16-character App Password at https://myaccount.google.com/apppasswords');
+    }
     console.error('Error sending OTP:', error);
     return false;
   }

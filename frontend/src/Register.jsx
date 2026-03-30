@@ -52,7 +52,8 @@ const Register = () => {
       setStep("otp");
       setMessage("OTP sent to your email! Check your inbox.");
     } catch (error) {
-      setMessage(error.response?.data?.message || error.response?.data?.error || error.message || "Error sending OTP");
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Error sending OTP";
+      setMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +85,8 @@ const Register = () => {
       // Use navigate directly instead of setTimeout for more reliable redirection
       navigate("/dashboard");
     } catch (error) {
-      setMessage(error.response?.data?.message || error.response?.data?.error || error.message || "Error verifying OTP");
+      const errorMsg = error.response?.data?.message || error.response?.data?.error || error.message || "Error verifying OTP";
+      setMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }

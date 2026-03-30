@@ -77,6 +77,18 @@ router.post("/send-otp", otpLimiter, async (req, res) => {
 
     // Get database connection
     const db = await getDB();
+    const usersCollection = db.collection('users');
+
+    // If it's a login (not a new user registration), check if user exists first
+    if (!isNewUser) {
+      const existingUser = await usersCollection.findOne({ email: email });
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found. Please register first.",
+        });
+      }
+    }
 
     // Store OTP in DB
     const collection = db.collection('email_verifications');

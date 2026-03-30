@@ -69,7 +69,8 @@ const Login = () => {
         setMessage(response.data.message || "Failed to send OTP. Please try again.");
       }
     } catch (error) {
-      setMessage("Failed to send OTP. Please try again.");
+      const errorMsg = error.response?.data?.message || "Failed to send OTP. Please try again.";
+      setMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +111,8 @@ const Login = () => {
         setMessage(response.data.message || "Invalid OTP. Please try again.");
       }
     } catch (error) {
-      setMessage("OTP verification failed. Please try again.");
+      const errorMsg = error.response?.data?.message || "OTP verification failed. Please try again.";
+      setMessage(errorMsg);
     } finally {
       setIsLoading(false);
     }

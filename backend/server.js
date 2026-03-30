@@ -34,9 +34,14 @@ connectDB().then(db => {
   }
 }).catch(err => {
   console.error('❌ Database connection failed:', err.message);
-  // Continue running even if database connection fails (will use mock database)
-  const { initializeDatabase } = require('./utils/databaseMigration');
-  initializeDatabase();
+  
+  if (process.env.MONGODB_DISABLE_FALLBACK !== 'true') {
+    // Continue running even if database connection fails (will use memory server/mock database)
+    const { initializeDatabase } = require('./utils/databaseMigration');
+    initializeDatabase();
+  } else {
+    console.error('⚠️  Database initialization skipped because fallback is disabled.');
+  }
 });
 
 // Middleware
